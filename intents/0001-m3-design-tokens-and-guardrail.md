@@ -1,7 +1,7 @@
 ---
 id: "0001"
 title: Add Material 3 design tokens, themed components and a style guardrail
-status: approved
+status: done
 requested_by: rbrancher
 issue: 2
 final_slice: false
@@ -30,10 +30,10 @@ so that later screens can be made legible in sun and at night without each one i
 its own look.
 
 ## Acceptance criteria
-- [ ] AC1: A `ThemeExtension<AppTokens>` in `lib/app_tokens.dart` exposes spacing
+- [x] AC1: A `ThemeExtension<AppTokens>` in `lib/app_tokens.dart` exposes spacing
       (at least small, medium and large), a corner radius, and status color pairs
       (color plus on-color) for on time, closing soon, closed, checked in and DNF.
-- [ ] AC2: Status colors follow the M3 custom-color pattern. Fixed source hues are allowed
+- [x] AC2: Status colors follow the M3 custom-color pattern. Fixed source hues are allowed
       only in `lib/app_tokens.dart`: green for on time, amber for closing soon. Each is
       turned into a container/on-container pair with
       `ColorScheme.fromSeed(seedColor: source, brightness: …)` for the current brightness.
@@ -41,27 +41,27 @@ its own look.
       `outline` on `surface`. A unit test builds tokens for light and dark, each with
       several app seed colors including the default, and checks that every status pair
       has at least 4.5:1 contrast.
-- [ ] AC3: `DayNight.dayTheme` and `nightTheme` register `AppTokens` in `extensions`, and
+- [x] AC3: `DayNight.dayTheme` and `nightTheme` register `AppTokens` in `extensions`, and
       `Theme.of(context).extension<AppTokens>()` is non-null in the app. A widget test
       checks this in both modes.
-- [ ] AC4: The seed color remains configurable (the existing `DayNight.color` setter
+- [x] AC4: The seed color remains configurable (the existing `DayNight.color` setter
       rebuilds the themes and tokens), and `toggleMode` still switches day and night.
       Tests cover both.
-- [ ] AC5: The theme sets `FilledButton`, `OutlinedButton` and `SnackBar` styles using
+- [x] AC5: The theme sets `FilledButton`, `OutlinedButton` and `SnackBar` styles using
       tokens or color roles. The only `lib/` files changed are `day_night.dart`,
       `main.dart` (only if needed for wiring) and
       `app_smoke_test.dart` still passes.
-- [ ] AC6: A guardrail test, `test/style_guardraid fails on
+- [x] AC6: A guardrail test, `test/style_guardraid fails on
       `Colors.` (except `Colors.transparent`), `Color(0x`, `fontSize:` and `Flushbar`.
       It exempts `lib/day_night.dart` and `lib/ap
       Today's violations are recorded in a per-file baseline list in the test. A file
       fails if its count exceeds its baseline, anany.
       Baseline counts may only go down. A PR that raises any baseline must say why in
       its description.
-- [ ] AC7: The guardrail's scanning function is unit tested against in-memory sample
+- [x] AC7: The guardrail's scanning function is unit tested against in-memory sample
       sources. A sample that adds a hard-coded cohbar` is
       reported, and a sample using only `colorScheme` roles passes.
-- [ ] AC8: `AppTokens` provides a `numeric` text . It is
+- [x] AC8: `AppTokens` provides a `numeric` text . It is
       based on `textTheme.titleLarge` with `FontFeature.tabularFigures()`. A unit test
       checks the font feature is present in light
 
