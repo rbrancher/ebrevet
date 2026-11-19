@@ -1,7 +1,7 @@
 ---
 id: "0002"
 title: Apply Material 3 tokens and button hierarchy to the event list screen
-status: draft
+status: approved
 requested_by: rbrancher
 issue: 2
 final_slice: false
@@ -9,6 +9,7 @@ priority: medium
 size: M
 risk: low
 touches:
+  - lib/main.dart
   - lib/event_list_page.dart
   - lib/event_card.dart
   - lib/event_header_card.dart
@@ -43,11 +44,12 @@ action, so that I can read it in sun or at night and see the next step at once.
       `FilledButton.tonal` or `OutlinedButton` (secondary) or `TextButton` (tertiary).
       Widget tests with the mock feed check that a card has exactly one `FilledButton` and
       that its label is the start action.
-- [ ] AC5: The event list screen's toasts show as M3 `SnackBar`s via a new helper in
-      `lib/snackbarglobal.dart` (for example `AppSnack.show(message, {style})`), using the
-      existing `ScaffoldMessenger`. Error style uses `error`/`onError` and the others use
-      theme roles or `AppTokens`. The old `FlushbarGlobal` stays for the other screens until
-      their slices. A widget test shows a `SnackBar` with the message text.
+- [ ] AC5: Add a global `scaffoldMessengerKey` to `MaterialApp` in `lib/main.dart`, and a
+      helper `AppSnack.show(message, {style})` in `lib/snackbarglobal.dart` that shows M3
+      `SnackBar`s through it. The error style uses `error`/`onError`; other styles use theme
+      roles or `AppTokens`. Migrate only the calls in `event_list_page.dart`,
+      `event_card.dart` and `event_header_card.dart`. `FlushbarGlobal` stays for the other
+      screens until their slices. A widget test shows a `SnackBar` with the message text.
 - [ ] AC6: Check-in, start-code, ride-start logic and the messages shown are unchanged.
       Only the widget that displays them changes. Existing tests pass.
 - [ ] AC7: A widget test pumps the event list in mock mode in light and dark with
