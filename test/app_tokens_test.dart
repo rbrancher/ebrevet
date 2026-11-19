@@ -201,7 +201,12 @@ void main() {
           brightness == Brightness.light ? dn.dayTheme : dn.nightTheme;
       final numeric = tokensOf(theme).numeric;
       expect(numeric.fontFeatures, contains(const FontFeature.tabularFigures()));
-      expect(numeric.fontSize, theme.textTheme.titleLarge!.fontSize);
+      // Intent 0005: compare with the localized titleLarge (what
+      // Theme.of(context) returns); the raw ThemeData style has no size.
+      final localized =
+          ThemeData.localize(theme, Typography.englishLike2021).textTheme;
+      expect(numeric.fontSize, isNotNull);
+      expect(numeric.fontSize, localized.titleLarge!.fontSize);
       expect(numeric.color, theme.textTheme.titleLarge!.color);
     });
   }

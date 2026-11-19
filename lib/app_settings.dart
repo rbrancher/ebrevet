@@ -19,6 +19,7 @@ import 'package:ebrevet_card/mylogger.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import 'app_tokens.dart';
 import 'region.dart';
 import 'region_data.dart';
 import 'my_settings.dart';
@@ -156,7 +157,9 @@ class AppSettings {
 
   // Other
   static MySetting<Color> themeColor = MySetting(
-      key: 'key-theme-color', defaultValue: Colors.blue, title: 'Theme Color');
+      key: 'key-theme-color',
+      defaultValue: AppTokens.defaultSeed,
+      title: 'Theme Color');
 
   // Preferences
 

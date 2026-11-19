@@ -39,10 +39,7 @@ class _MyActivatedEventsPageState extends State<MyActivatedEventsPage> {
 
     return Scaffold(
         appBar: AppBar(
-          title: const Text(
-            'My Rides',
-            //style: TextStyle(fontSize: 14),
-          ),
+          title: const Text('My Rides'),
           actions: [
             IconButton(
                 icon: dayNight.icon,

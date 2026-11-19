@@ -17,6 +17,20 @@
 import 'package:flutter/material.dart';
 import 'package:confetti/confetti.dart';
 
+import 'app_tokens.dart';
+
+/// Confetti colors from the theme: primary, secondary, tertiary and the
+/// on-time status color.
+List<Color> confettiColors(BuildContext context) {
+  final scheme = Theme.of(context).colorScheme;
+  return [
+    scheme.primary,
+    scheme.secondary,
+    scheme.tertiary,
+    AppTokens.of(context).onTime.color,
+  ];
+}
+
 class ConfettiDialog extends StatefulWidget {
   final bool shouldConfetti;
   final Widget content;
@@ -66,6 +80,7 @@ class _ConfettiDialogState extends State<ConfettiDialog> {
               confettiController: _controller,
               blastDirectionality: BlastDirectionality.explosive,
               shouldLoop: false,
+              colors: confettiColors(context),
             ),
         ],
       ),

@@ -26,13 +26,9 @@ const Set<String> exemptFiles = {
   'lib/region_data.dart',
 };
 
-/// Violations present when the guardrail was added.
-const Map<String, int> baseline = {
-  'lib/app_settings.dart': 1,
-  'lib/cert_page.dart': 9,
-  'lib/my_activated_events_page.dart': 1,
-  'lib/settings_page.dart': 1,
-};
+/// Violations present when the guardrail was added. Emptied by intent 0005:
+/// every non-exempt file under lib/ must now have zero.
+const Map<String, int> baseline = {};
 
 /// Number of banned-pattern matches in [source].
 int countViolations(String source) => bannedPatterns.values
@@ -136,6 +132,42 @@ void main() {
     final offenders = [
       for (final e in readLibSources().entries)
         if (e.value.contains('Flushbar')) e.key
+    ];
+    expect(offenders, isEmpty, reason: offenders.join('\n'));
+  });
+
+  // AC1 (intent 0005): the baseline is empty, so the guardrail enforces zero
+  // for all of lib/ outside the exempt files.
+  test('baseline is empty and every non-exempt lib/ file is clean', () {
+    expect(baseline, isEmpty);
+    final sources = readLibSources();
+    final dirty = [
+      for (final e in sources.entries)
+        if (!exemptFiles.contains(e.key) && countViolations(e.value) > 0)
+          e.key
+    ];
+    expect(dirty, isEmpty, reason: dirty.join('\n'));
+    const cleaned = [
+      'lib/cert_page.dart',
+      'lib/confetti_dialog.dart',
+      'lib/settings_page.dart',
+      'lib/settings_tiles.dart',
+      'lib/log_page.dart',
+      'lib/my_activated_events_page.dart',
+      'lib/side_menu.dart',
+      'lib/app_settings.dart',
+    ];
+    for (final path in cleaned) {
+      expect(sources.containsKey(path), isTrue, reason: path);
+      expect(countViolations(sources[path]!), 0, reason: path);
+    }
+  });
+
+  // AC1 + AC4 (intent 0005): no ElevatedButton anywhere in lib/.
+  test('no file under lib/ uses ElevatedButton', () {
+    final offenders = [
+      for (final e in readLibSources().entries)
+        if (e.value.contains('ElevatedButton')) e.key
     ];
     expect(offenders, isEmpty, reason: offenders.join('\n'));
   });

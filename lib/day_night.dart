@@ -22,7 +22,8 @@ import 'app_tokens.dart';
 class DayNight extends ChangeNotifier {
   ThemeMode _mode;
   Color _color;
-  DayNight({ThemeMode mode = ThemeMode.light, Color color = Colors.blue})
+  DayNight(
+      {ThemeMode mode = ThemeMode.light, Color color = AppTokens.defaultSeed})
       : _mode = mode,
         _color = color;
   ThemeMode get mode => _mode;
