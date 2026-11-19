@@ -28,20 +28,10 @@ const Set<String> exemptFiles = {
 
 /// Violations present when the guardrail was added.
 const Map<String, int> baseline = {
-  'lib/activated_event.dart': 8,
   'lib/app_settings.dart': 1,
   'lib/cert_page.dart': 9,
-  'lib/checkin.dart': 2,
-  'lib/control.dart': 2,
-  'lib/log_page.dart': 2,
-  'lib/main.dart': 2,
   'lib/my_activated_events_page.dart': 1,
-  'lib/region.dart': 3,
-  'lib/report.dart': 7,
-  'lib/scheduled_events.dart': 2,
-  'lib/screen_shot.dart': 2,
   'lib/settings_page.dart': 1,
-  'lib/snackbarglobal.dart': 42,
 };
 
 /// Number of banned-pattern matches in [source].
@@ -115,6 +105,39 @@ void main() {
       expect(countViolations(sources[path]!), 0, reason: path);
       expect(baseline.containsKey(path), isFalse, reason: path);
     }
+  });
+
+  // AC4 (intent 0004): Flushbar is retired. Former toast files are no
+  // longer baselined, so the guardrail enforces zero for them.
+  test('former Flushbar files have no style violations', () {
+    const cleaned = [
+      'lib/snackbarglobal.dart',
+      'lib/activated_event.dart',
+      'lib/checkin.dart',
+      'lib/control.dart',
+      'lib/region.dart',
+      'lib/report.dart',
+      'lib/scheduled_events.dart',
+      'lib/log_page.dart',
+      'lib/screen_shot.dart',
+      'lib/main.dart',
+    ];
+    final sources = readLibSources();
+    for (final path in cleaned) {
+      expect(sources.containsKey(path), isTrue, reason: path);
+      expect(countViolations(sources[path]!), 0, reason: path);
+      expect(baseline.containsKey(path), isFalse, reason: path);
+    }
+  });
+
+  // AC4 (intent 0004): no file under lib/ mentions Flushbar. No baseline,
+  // no exemptions.
+  test('no file under lib/ contains Flushbar', () {
+    final offenders = [
+      for (final e in readLibSources().entries)
+        if (e.value.contains('Flushbar')) e.key
+    ];
+    expect(offenders, isEmpty, reason: offenders.join('\n'));
   });
 
   // AC7 (intent 0001)

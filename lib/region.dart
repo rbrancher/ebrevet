@@ -207,15 +207,15 @@ class Region {
       regionsLastRefreshed = timestampDateTime;
       await saveRegionMapToDisk(storedRegions);
       if (quiet == false) {
-        FlushbarGlobal.show("Loaded ${regionMap.length} regions from server");
+        AppSnack.show("Loaded ${regionMap.length} regions from server");
       } else {
         MyLogger.entry(
             "Successfully updated ${regionMap.length} (of $nRegion) regions from server (timestamp: $timestamp)");
       }
     } catch (e) {
       if (quiet == false) {
-        FlushbarGlobal.show("Error refreshing regions. No Internet?",
-            style: FlushbarStyle.error);
+        AppSnack.show("Error refreshing regions. No Internet?",
+            style: AppSnackStyle.error);
       }
       MyLogger.entry("Error refreshing regions: $e");
     }
