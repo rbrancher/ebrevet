@@ -4,6 +4,7 @@ title: Add Material 3 design tokens, themed components and a style guardrail
 status: approved
 requested_by: rbrancher
 issue: 2
+final_slice: false
 priority: medium
 size: M
 risk: low
