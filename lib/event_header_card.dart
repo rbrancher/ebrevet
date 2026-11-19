@@ -19,15 +19,15 @@ class EventHeaderCard extends StatelessWidget {
           children: [
             Text(
               event.nameDist,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
+              style: Theme.of(context)
+                  .textTheme
+                  .titleLarge
+                  ?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 4),
             Text(
               'Start: ${event.dateTime} (${event.eventStatusText})',
-              style: const TextStyle(fontSize: 16),
+              style: Theme.of(context).textTheme.bodyLarge,
             ),
           ],
         ),

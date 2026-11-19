@@ -220,11 +220,11 @@ class _LatestEventListState extends State<LatestEventList> {
           const Spacer(
             flex: 5,
           ),
-          ElevatedButton.icon(
+          OutlinedButton.icon(
             onPressed: () {
-              FlushbarGlobal.show(
+              AppSnack.show(
                   'Updating events for ${sourceSelection.eventInfoSource.fullDescription}... (This may take a few seconds.)',
-                  style: FlushbarStyle.info);
+                  style: AppSnackStyle.info);
               setState(() {
                 fetchingFromServerNow = true;
               });
@@ -308,7 +308,6 @@ class _EventSearchSettingsPageState extends State<EventSearchSettingsPage> {
       appBar: AppBar(
         title: const Text(
           'Info Source',
-          //style: TextStyle(fontSize: 14),
         ),
         actions: [
           IconButton(
