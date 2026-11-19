@@ -17,6 +17,8 @@
 
 import 'package:flutter/material.dart';
 
+import 'app_tokens.dart';
+
 class DayNight extends ChangeNotifier {
   ThemeMode _mode;
   Color _color;
@@ -27,18 +29,51 @@ class DayNight extends ChangeNotifier {
 
   ThemeData get themeData => (_mode == ThemeMode.light) ? dayTheme : nightTheme;
 
-  get dayTheme => ThemeData(
-        useMaterial3: true,
-        // colorScheme: ColorScheme.light(),
-        colorScheme: ColorScheme.fromSeed(
-            brightness: Brightness.light, seedColor: _color), //  Colors.blue),
-      );
+  ThemeData get dayTheme => _buildTheme(Brightness.light);
 
-  get nightTheme => ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-            brightness: Brightness.dark, seedColor: _color), //  Colors.blue),
-      );
+  ThemeData get nightTheme => _buildTheme(Brightness.dark);
+
+  ThemeData _buildTheme(Brightness brightness) {
+    final base = ThemeData(
+      useMaterial3: true,
+      colorScheme:
+          ColorScheme.fromSeed(brightness: brightness, seedColor: _color),
+    );
+    final scheme = base.colorScheme;
+    final tokens = AppTokens.fromScheme(scheme, base.textTheme);
+    final shape = RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(tokens.radius));
+    final padding = EdgeInsets.symmetric(
+        horizontal: tokens.spaceLarge, vertical: tokens.spaceSmall);
+    return base.copyWith(
+      extensions: <ThemeExtension<dynamic>>[tokens],
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: scheme.primary,
+          foregroundColor: scheme.onPrimary,
+          shape: shape,
+          padding: padding,
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: scheme.primary,
+          side: BorderSide(color: scheme.outline),
+          shape: shape,
+          padding: padding,
+        ),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: scheme.inverseSurface,
+        contentTextStyle: base.textTheme.bodyMedium
+            ?.copyWith(color: scheme.onInverseSurface),
+        actionTextColor: scheme.inversePrimary,
+        shape: shape,
+        insetPadding: EdgeInsets.all(tokens.spaceMedium),
+      ),
+    );
+  }
 
   Icon get icon =>
       Icon((_mode == ThemeMode.light) ? Icons.light_mode : Icons.dark_mode);
@@ -47,7 +82,7 @@ class DayNight extends ChangeNotifier {
     notifyListeners();
   }
 
-  set color(c) {
+  set color(Color c) {
     _color = c;
     notifyListeners();
   }
