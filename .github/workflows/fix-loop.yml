@@ -83,6 +83,10 @@ jobs:
         if: steps.ctx.outputs.skip != 'true'
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Agent PRs are opened by the Claude app. The job-level `if` already limits
+          # this workflow to agent/* branches in this repository (never forks).
+          allowed_bots: claude
+          restrict_untrusted_prs: "false"
           prompt: ${{ steps.prompt.outputs.text }}
           claude_args: >-
             --model ${{ vars.IMPLEMENT_MODEL || 'claude-opus-5-5' }}
