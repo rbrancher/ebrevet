@@ -50,7 +50,7 @@ class ScreenShot {
       await Share.shareXFiles([XFile(imgFile.path)]);
     } catch (e) {
       var message = "Failed to save screenshot: $e";
-      FlushbarGlobal.show(message, style: FlushbarStyle.error);
+      AppSnack.show(message, style: AppSnackStyle.error);
       MyLogger.entry(message, severity: Severity.error);
     }
   }

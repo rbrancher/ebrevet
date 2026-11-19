@@ -24,9 +24,6 @@
 // upcoming events or otherwise indicated beyond the
 // very basic Underway! text.
 
-// TODO Take another look at Flushbar formatting for different cases
-// Test them.
-
 // TODO Prerider checkins?
 
 // TODO Checkin refresh button and/or timer refresh
@@ -125,7 +122,6 @@ class MyApp extends StatelessWidget {
     return Consumer<DayNight>(builder: (context, dayNight, child) {
       return MaterialApp(
         scaffoldMessengerKey: AppSnack.messengerKey,
-        navigatorKey: FlushbarGlobal.navigatorKey,
         title: 'eBrevet Card',
         debugShowCheckedModeBanner: false,
         theme: dayNight.dayTheme,

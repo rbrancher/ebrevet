@@ -332,7 +332,7 @@ class CommentFetcher {
         }).toList();
 
         for (final msg in msgList) {
-          FlushbarGlobal.show(msg, style: FlushbarStyle.comment);
+          AppSnack.show(msg, style: AppSnackStyle.comment);
         }
       }
     } catch (e, st) {

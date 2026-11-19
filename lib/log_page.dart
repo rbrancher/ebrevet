@@ -88,7 +88,7 @@ class LogPageState extends State<LogPage> {
       MyLogger.entry(shareResult.status.toString());
     } catch (e) {
       var message = "Failed to share activity log";
-      FlushbarGlobal.show(message, style: FlushbarStyle.error);
+      AppSnack.show(message, style: AppSnackStyle.error);
     }
   }
 }

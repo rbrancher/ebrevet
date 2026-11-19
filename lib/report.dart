@@ -47,18 +47,18 @@ class Report {
     _sendReportToServer(report).then((response) {
       _recordReportResponse(response);
       lastSuccessfulServerAccess = DateTime.now();
-      FlushbarGlobal.show("Current checkin status uploaded.");
+      AppSnack.show("Current checkin status uploaded.");
 
       onUploadDone?.call();
     }).catchError((e) {
       if (e is NoPreviousDataException) {
-        FlushbarGlobal.show("Invalid event data: ${e.toString()}",
-            style: FlushbarStyle.error);
+        AppSnack.show("Invalid event data: ${e.toString()}",
+            style: AppSnackStyle.error);
       } else {
-        FlushbarGlobal.show(
+        AppSnack.show(
             "No Internet. "
             "Cannot upload results now. Try later.",
-            style: FlushbarStyle.error);
+            style: AppSnackStyle.error);
       }
 
       // Save the event history even if the upload was unsuccessful.
@@ -92,8 +92,8 @@ class Report {
       result = ('Check in data successfully uploaded to server.');
       // SnackbarGlobal.show(result);
     } else {
-      FlushbarGlobal.show("Failed to upload checkin: $result",
-          style: FlushbarStyle.error);
+      AppSnack.show("Failed to upload checkin: $result",
+          style: AppSnackStyle.error);
     }
 
     // It may seem excessive to save the whole event history
