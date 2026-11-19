@@ -1,5 +1,6 @@
-# Changes to the harness, workflows and intent specs need maintainer approval.
+# Changes to the harness, workflows, intent specs and guardrail baselines need maintainer approval.
 /.github/   @rbrancher
 /harness/   @rbrancher
 /intents/   @rbrancher
 /CLAUDE.md  @rbrancher
+/test/style_guardrail_test.dart  @rbrancher
