@@ -1,5 +1,6 @@
 import 'package:ebrevet_card/utility.dart';
 import 'package:flutter/material.dart';
+import 'app_tokens.dart';
 import 'checkin_progress.dart';
 import 'control.dart'; // For Control and ControlStyle
 import 'event.dart';
@@ -30,6 +31,8 @@ class RiderCheckinDetailsPage extends StatelessWidget {
     final List<Control> controls = event.controls;
     final numControls = controls.length;
     final String eventName = event.nameDist;
+    final scheme = Theme.of(context).colorScheme;
+    final tokens = AppTokens.of(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -68,7 +71,7 @@ class RiderCheckinDetailsPage extends StatelessWidget {
                                 ? Icons.directions_bike
                                 : Icons.info_outline,
                         size: 16,
-                        color: Colors.blueGrey,
+                        color: scheme.onSurfaceVariant,
                       ),
                       const SizedBox(width: 6),
                       Text("Status: ${rider.result}"),
@@ -78,8 +81,8 @@ class RiderCheckinDetailsPage extends StatelessWidget {
                     const SizedBox(height: 2),
                     Row(
                       children: [
-                        const Icon(Icons.timer,
-                            size: 16, color: Colors.blueGrey),
+                        Icon(Icons.timer,
+                            size: 16, color: scheme.onSurfaceVariant),
                         const SizedBox(width: 6),
                         Text("Elapsed Time: $elapsedTime"),
                       ],
@@ -135,14 +138,14 @@ class RiderCheckinDetailsPage extends StatelessWidget {
                       // provide statistics like average speed
 
                       final checkinIcon = checkin != null
-                          ? const Icon(
+                          ? Icon(
                               Icons.check_circle_outline_outlined,
-                              color: Colors.green,
+                              color: tokens.checkedIn.color,
                               size: 30,
                             )
-                          : const Icon(
+                          : Icon(
                               Icons.radio_button_unchecked,
-                              color: Colors.orange,
+                              color: scheme.onSurfaceVariant,
                               size: 30,
                             );
 
@@ -178,7 +181,8 @@ class RiderCheckinDetailsPage extends StatelessWidget {
                                   style: Theme.of(context)
                                       .textTheme
                                       .bodySmall
-                                      ?.copyWith(color: Colors.grey[700]),
+                                      ?.copyWith(
+                                          color: scheme.onSurfaceVariant),
                                 ),
 
 // TODO The open and close times given here are invalid for a preride
@@ -188,22 +192,23 @@ class RiderCheckinDetailsPage extends StatelessWidget {
                                 style: Theme.of(context)
                                     .textTheme
                                     .bodySmall
-                                    ?.copyWith(color: Colors.grey[700]),
+                                    ?.copyWith(color: scheme.onSurfaceVariant),
                               ),
                               Text(
                                 "CLOSE: ${control.closeTimeString}",
                                 style: Theme.of(context)
                                     .textTheme
                                     .bodySmall
-                                    ?.copyWith(color: Colors.grey[700]),
+                                    ?.copyWith(color: scheme.onSurfaceVariant),
                               ),
                               if (comment != null) ...[
                                 const SizedBox(height: 4),
                                 Row(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Icon(Icons.comment,
-                                        size: 16, color: Colors.blueGrey),
+                                    Icon(Icons.comment,
+                                        size: 16,
+                                        color: scheme.onSurfaceVariant),
                                     const SizedBox(width: 6),
                                     Expanded(child: Text(comment)),
                                   ],

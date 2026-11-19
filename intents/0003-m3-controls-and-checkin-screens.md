@@ -1,7 +1,7 @@
 ---
 id: "0003"
 title: Apply Material 3 tokens, status colors and button hierarchy to the controls and check-in screens
-status: approved
+status: done
 requested_by: rbrancher
 issue: 2
 final_slice: false
@@ -37,31 +37,31 @@ status colors, with times and distances that read at a glance and an obvious CHE
 button, so that I can see my next action in sun or at night.
 
 ## Acceptance criteria
-- [ ] AC1: The seven files listed in Problem contain no `Colors.` (except
+- [x] AC1: The seven files listed in Problem contain no `Colors.` (except
       `Colors.transparent`), `Color(0x`, `fontSize:` or `Flushbar`. Their entries are
       removed from the `baseline` map in `test/style_guardrail_test.dart`, so the guardrail
       enforces this. No other baseline count is raised. `time_till.dart` and
       `checkin_status_timed.dart` have no violations today and must stay clean.
-- [ ] AC2: Control state icons and indicators use the `AppTokens` status pairs: checked in
+- [x] AC2: Control state icons and indicators use the `AppTokens` status pairs: checked in
       uses the checked-in pair, an open control uses on time (or closing soon when the
       existing logic already says it is closing soon), a closed or missed control uses the
       closed pair, and DNF uses the DNF pair. The mapping from existing control state to
       token is one small function covered by a unit test for each state. No new rule decides
       which state a control is in.
-- [ ] AC3: Times and distances on the control card (open, close, distance to control) use
+- [x] AC3: Times and distances on the control card (open, close, distance to control) use
       `AppTokens.numeric`. The progress indicator in `checkin_progress.dart` takes its colors
       from the theme and its label size from `textTheme`. A widget test checks the rendered
       style of a control's close time has the tabular figures font feature.
-- [ ] AC4: Each of the controls screen and the check-in status screen has at most one
+- [x] AC4: Each of the controls screen and the check-in status screen has at most one
       `FilledButton`. On the controls screen it is CHECK IN, on the one control that is
       available. When no control is available, it has none. GPS Update and Resend Checkins
       use `FilledButton.tonal` or `OutlinedButton`, and dialog cancel and dismiss actions use
       `TextButton`. Widget tests count `FilledButton`s with events from the mock feed.
-- [ ] AC5: `FlushbarGlobal.show` calls in `controls_view_page.dart` and `control_card.dart`
+- [x] AC5: `FlushbarGlobal.show` calls in `controls_view_page.dart` and `control_card.dart`
       move to `AppSnack.show` from slice (b). The messages and their trigger conditions are
       unchanged. A widget test shows a `SnackBar` with the GPS update message after the GPS
       Update button is tapped in mock mode.
-- [ ] AC6: Check-in logic is unchanged. The proximity radius, open/close window, skip
+- [x] AC6: Check-in logic is unchanged. The proximity radius, open/close window, skip
       rules, comment dialog, late flag, start/finish codes, persisted ride state and report
       posting are not edited. `git diff` for this slice touches only widget build code,
       styles and the toast calls. A regression test pumps the controls screen for an
@@ -72,11 +72,11 @@ button, so that I can see my next action in sun or at night.
       check-in recorded for that control index on the `ActivatedEvent`, and
       `MockServer.receivedReports` must contain exactly one report with that
       `control_index`.
-- [ ] AC7: A widget test pumps the controls screen for an activated mock event in light and
+- [x] AC7: A widget test pumps the controls screen for an activated mock event in light and
       dark with `textContrastGuideline` and `androidTapTargetGuideline`, and both pass for
       the cards and buttons on this screen.
-- [ ] AC8: The map icon in `map_icon_button.dart` uses `colorScheme.primary`.
-- [ ] AC9: `FilledButton.tonal` works. Slice (a)'s `filledButtonTheme` in `day_night.dart`
+- [x] AC8: The map icon in `map_icon_button.dart` uses `colorScheme.primary`.
+- [x] AC9: `FilledButton.tonal` works. Slice (a)'s `filledButtonTheme` in `day_night.dart`
       forces `backgroundColor: primary` on every `FilledButton`, which makes tonal buttons
       look the same as primary ones. Remove that color override and keep only shape,
       padding and text style; M3's defaults already give `FilledButton` the `primary`

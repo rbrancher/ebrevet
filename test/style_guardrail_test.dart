@@ -32,16 +32,9 @@ const Map<String, int> baseline = {
   'lib/app_settings.dart': 1,
   'lib/cert_page.dart': 9,
   'lib/checkin.dart': 2,
-  'lib/checkin_progress.dart': 6,
-  'lib/checkin_rider_details.dart': 8,
-  'lib/checkin_status_page.dart': 3,
-  'lib/checkin_status_rider.dart': 3,
   'lib/control.dart': 2,
-  'lib/control_card.dart': 9,
-  'lib/controls_view_page.dart': 3,
   'lib/log_page.dart': 2,
   'lib/main.dart': 2,
-  'lib/map_icon_button.dart': 1,
   'lib/my_activated_events_page.dart': 1,
   'lib/region.dart': 3,
   'lib/report.dart': 7,
@@ -99,6 +92,28 @@ void main() {
           reason: '${e.key} no longer exists; remove it from the baseline');
       expect(exemptFiles.contains(e.key), isFalse);
       expect(e.value, greaterThan(0));
+    }
+  });
+
+  // AC1 (intent 0003): the controls and check-in screens are fully clean and
+  // no longer baselined, so the guardrail enforces zero for them.
+  test('controls and check-in screen files have no style violations', () {
+    const cleaned = [
+      'lib/controls_view_page.dart',
+      'lib/control_card.dart',
+      'lib/checkin_progress.dart',
+      'lib/checkin_rider_details.dart',
+      'lib/checkin_status_page.dart',
+      'lib/checkin_status_rider.dart',
+      'lib/map_icon_button.dart',
+      'lib/time_till.dart',
+      'lib/checkin_status_timed.dart',
+    ];
+    final sources = readLibSources();
+    for (final path in cleaned) {
+      expect(sources.containsKey(path), isTrue, reason: path);
+      expect(countViolations(sources[path]!), 0, reason: path);
+      expect(baseline.containsKey(path), isFalse, reason: path);
     }
   });
 

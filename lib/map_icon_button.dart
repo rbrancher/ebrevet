@@ -38,7 +38,7 @@ class MapIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return IconButton(
-      icon: const Icon(Icons.map, color: Colors.blue),
+      icon: Icon(Icons.map, color: Theme.of(context).colorScheme.primary),
       tooltip: 'Open in Maps',
       onPressed: _openMap,
     );

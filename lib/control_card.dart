@@ -36,6 +36,76 @@ import 'checkin.dart';
 import 'event.dart';
 import 'my_activated_events.dart';
 import 'confetti_dialog.dart';
+import 'app_tokens.dart';
+
+/// Display status of a control. It only names states that the existing
+/// ride logic already decides; it adds no rules of its own.
+enum ControlStatus { checkedIn, onTime, closingSoon, closed, dnf }
+
+/// Where "now" falls in a control's open/close window, as computed by the
+/// existing open/close times (see `controlStatusString`).
+enum ControlWindow { unknown, notYetOpen, open, closed }
+
+/// Maps existing control state to a [ControlStatus], or null for a control
+/// with no status to show yet (not open, or times unknown).
+ControlStatus? controlStatusOf({
+  required bool checkedIn,
+  required bool dnf,
+  required bool skipped,
+  required ControlWindow window,
+}) {
+  if (checkedIn) return ControlStatus.checkedIn;
+  if (dnf) return ControlStatus.dnf;
+  if (skipped) return ControlStatus.closed;
+  switch (window) {
+    case ControlWindow.open:
+      return ControlStatus.onTime;
+    case ControlWindow.closed:
+      return ControlStatus.closed;
+    case ControlWindow.notYetOpen:
+    case ControlWindow.unknown:
+      return null;
+  }
+}
+
+/// The `AppTokens` status pair for [status].
+StatusColors controlStatusColors(ControlStatus status, AppTokens tokens) {
+  switch (status) {
+    case ControlStatus.checkedIn:
+      return tokens.checkedIn;
+    case ControlStatus.onTime:
+      return tokens.onTime;
+    case ControlStatus.closingSoon:
+      return tokens.closingSoon;
+    case ControlStatus.closed:
+      return tokens.closed;
+    case ControlStatus.dnf:
+      return tokens.dnf;
+  }
+}
+
+/// A small filled label drawn in a status pair.
+class ControlStatusBadge extends StatelessWidget {
+  final ControlStatus status;
+  final String text;
+  final TextStyle? style;
+
+  const ControlStatusBadge(this.status, this.text, {this.style, super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = AppTokens.of(context);
+    final colors = controlStatusColors(status, tokens);
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: tokens.spaceSmall / 2),
+      decoration: BoxDecoration(
+        color: colors.color,
+        borderRadius: BorderRadius.circular(tokens.spaceSmall / 2),
+      ),
+      child: Text(text, style: style?.copyWith(color: colors.onColor)),
+    );
+  }
+}
 
 class ControlCard extends StatefulWidget {
   final Control control;
@@ -91,6 +161,10 @@ class _ControlCardState extends State<ControlCard> {
             ? Signature.checkInCode(activeEvent, control).wordText
             : Signature.forCert(activeEvent).xyText);
 
+    final numeric = AppTokens.of(context).numeric;
+    final status = controlStatus();
+    final statusText = controlStatusString();
+
     return Card(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -121,14 +195,7 @@ class _ControlCardState extends State<ControlCard> {
                         style: const TextStyle(fontWeight: FontWeight.bold)),
                   TextSpan(
                     text: control.name,
-                    style: TextStyle(
-                      fontSize: Theme.of(context)
-                              .primaryTextTheme
-                              .bodyLarge
-                              ?.fontSize ??
-                          16,
-                      // color: Theme.of(context).colorScheme.primary,
-                    ),
+                    style: Theme.of(context).textTheme.bodyLarge,
                   ),
                 ],
               ),
@@ -137,14 +204,18 @@ class _ControlCardState extends State<ControlCard> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (widget.style == ControlsViewStyle.live) ...[
-                  Text(exactDistanceString(control.cLoc)),
-                  Text(controlStatusString()),
+                  Text(exactDistanceString(control.cLoc), style: numeric),
+                  if (status == null || statusText.isEmpty)
+                    Text(statusText, style: numeric)
+                  else
+                    ControlStatusBadge(status, statusText, style: numeric),
                 ],
                 if (widget.style == ControlsViewStyle.future) ...[
                   // Text( "Control: ${1 + control.index} of ${widget.event.controls.length}"),
                   Text("Address: ${control.address}"),
                   Text("Style: ${control.style.name}"),
-                  Text('Course distance: ${control.distMi.toString()} mi'),
+                  Text('Course distance: ${control.distMi.toString()} mi',
+                      style: numeric),
                   // Text(exactDistanceString(control.cLoc)),
                   // Text("Location: ${control.lat} N;  ${control.long}E"),
                   // MapIconButton(latitude: control.lat, longitude: control.long),
@@ -196,25 +267,39 @@ class _ControlCardState extends State<ControlCard> {
     }
   }
 
+  // Status for coloring only. The window uses the same open/close
+  // comparisons as controlStatusString(); it does not call
+  // isControlOpen(), which has the lateCheckIn side effect.
+  ControlStatus? controlStatus() {
+    final activeEvent = widget.activeEvent;
+    if (activeEvent == null) return null;
+    final c = widget.control;
+    final open = activeEvent.openActual(c.index);
+    final close = activeEvent.closeActual(c.index);
+    final now = DateTime.now();
+    ControlWindow window;
+    if ((open ?? close) == null) {
+      window = ControlWindow.unknown;
+    } else if (widget.event.isUntimedControl(c)) {
+      window = ControlWindow.open;
+    } else if (open!.isAfter(now)) {
+      window = ControlWindow.notYetOpen;
+    } else if (close!.isBefore(now)) {
+      window = ControlWindow.closed;
+    } else {
+      window = ControlWindow.open;
+    }
+    return controlStatusOf(
+      checkedIn: activeEvent.controlCheckInTime(c) != null,
+      dnf: activeEvent.outcomes.overallOutcome == OverallOutcome.dnf,
+      skipped: activeEvent.wasSkipped(c),
+      window: window,
+    );
+  }
+
   String exactDistanceString(ControlLocation cLoc) {
     return ('Dir: ${cLoc.crowDistString} ${cLoc.crowCompassHeadingString}');
   }
-
-  // Widget showControlName() {
-  //   var control = widget.control;
-  //   return GestureDetector(
-  //     onTap: () {
-  //       openControlInfoDialog();
-  //     },
-  //     child: Text(
-  //       control.name,
-  //       style: TextStyle(
-  //           fontSize:
-  //               Theme.of(context).primaryTextTheme.bodyLarge?.fontSize ?? 16,
-  //           color: Theme.of(context).colorScheme.primary),
-  //     ),
-  //   );
-  // }
 
   Future openControlInfoDialog() {
     var activeEvent = widget.activeEvent;
@@ -228,14 +313,14 @@ class _ControlCardState extends State<ControlCard> {
 
       var lastUpload = activeEvent?.outcomes.lastUpload;
 
+      final checkedInColor = AppTokens.of(context).checkedIn.color;
       var checkInIcon = activeEvent == null
-          ? const Icon(Icons.check_box_outline_blank_outlined,
-              color: Colors.green)
+          ? Icon(Icons.check_box_outline_blank_outlined, color: checkedInColor)
           : ((lastUpload != null &&
                   (lastUpload.isAfter(checkInTime) ||
                       activeEvent.wasAutoChecked(control.index)))
-              ? const Icon(Icons.check_circle, color: Colors.green)
-              : const Icon(Icons.pending_sharp, color: Colors.orangeAccent));
+              ? Icon(Icons.check_circle, color: checkedInColor)
+              : Icon(Icons.pending_sharp, color: checkedInColor));
       checkInRow = Row(
         children: [
           const Text('Check In: '),
@@ -309,20 +394,18 @@ class _ControlCardState extends State<ControlCard> {
 
     // Can't check in -- you skipped me -- SKIPPED! Text
     if (activeEvent.wasSkipped(c)) {
-      return Text('SKIPPED!',
-          style: TextStyle(
-            fontSize:
-                Theme.of(context).primaryTextTheme.bodyLarge?.fontSize ?? 16,
-          ));
+      return ControlStatusBadge(ControlStatus.closed, 'SKIPPED!',
+          style: Theme.of(context).textTheme.bodyLarge);
     }
 
-    // Can't check in -- already did (show time, green/orange check etc..)
+    // Can't check in -- already did (show time, uploaded/pending check etc..)
     if (checkInTime != null) {
+      final checkedInColor = AppTokens.of(context).checkedIn.color;
       var checkInIcon = (lastUpload != null &&
               (lastUpload.isAfter(checkInTime) ||
                   activeEvent.wasAutoChecked(c.index)))
-          ? const Icon(Icons.check_circle, color: Colors.green)
-          : const Icon(Icons.check_circle, color: Colors.orangeAccent);
+          ? Icon(Icons.check_circle, color: checkedInColor)
+          : Icon(Icons.pending_sharp, color: checkedInColor);
       return Column(
         children: [
           checkInIcon,
@@ -376,7 +459,12 @@ class _ControlCardState extends State<ControlCard> {
     } else {
       // Otherwise, control is available. Gosh, let the cat check in
       // with ACTUAL CHECK IN BUTTON!
-      return ElevatedButton(
+      // The only FilledButton on the controls screen (intent 0003).
+      final labelStyle = Theme.of(context)
+          .textTheme
+          .bodySmall
+          ?.copyWith(fontWeight: FontWeight.bold);
+      return FilledButton(
           onPressed: () async {
             if (AppSettings.allowCheckinComment.value ||
                 activeEvent.wouldSkip(c)) {
@@ -395,16 +483,11 @@ class _ControlCardState extends State<ControlCard> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Text('CHECK IN'),
-              if (activeEvent.lateCheckIn)
-                Text('LATE!',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.error,
-                        )),
+              // Error red is illegible on the primary fill; these labels
+              // inherit the button's onPrimary color and are bold instead.
+              if (activeEvent.lateCheckIn) Text('LATE!', style: labelStyle),
               if (activeEvent.wouldSkip(c))
-                Text('SKIPPING!',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.error,
-                        )),
+                Text('SKIPPING!', style: labelStyle),
             ],
           ));
     }
@@ -565,7 +648,7 @@ class _ControlCardState extends State<ControlCard> {
     final checkInDateTime =
         activeEvent!.outcomes.getControlCheckInTime(control.index);
     final checkInTimeString = Utility.toBriefDateTimeString(checkInDateTime);
-    FlushbarGlobal.show(
+    AppSnack.show(
         "Checked into Control ${control.index + 1} at $checkInTimeString");
   }
 

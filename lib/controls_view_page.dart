@@ -94,10 +94,9 @@ class _ControlsViewPageState extends State<ControlsViewPage> {
       if (mounted) {
         setState(() => _updating = false);
         if (gpsStatus == null) {
-          FlushbarGlobal.show("GPS Location Updated");
+          AppSnack.show("GPS Location Updated");
         } else {
-          FlushbarGlobal.show(
-              "GPS Unavailable. Position not updated: $gpsStatus");
+          AppSnack.show("GPS Unavailable. Position not updated: $gpsStatus");
         }
       }
     }
@@ -253,8 +252,10 @@ class _ControlsViewPageState extends State<ControlsViewPage> {
         lastLocationText = 'Location found $agoText';
       } else {
         lastLocationText = "GPS OFF! Last update: $agoText";
-        lastLocationStyle =
-            const TextStyle(fontWeight: FontWeight.bold, fontSize: 15);
+        lastLocationStyle = Theme.of(context)
+            .textTheme
+            .bodyLarge
+            ?.copyWith(fontWeight: FontWeight.bold);
       }
     }
 
@@ -309,7 +310,7 @@ class _ControlsViewPageState extends State<ControlsViewPage> {
         const SizedBox(height: 8),
         Row(
           children: [
-            ElevatedButton(
+            FilledButton.tonal(
               onPressed: () {
                 // MyLogger.entry("Calling _handleUpdate()");
                 _handleGPSUpdate();
@@ -317,7 +318,7 @@ class _ControlsViewPageState extends State<ControlsViewPage> {
               child: const Text("GPS Update"),
             ),
             const Spacer(),
-            ElevatedButton(
+            OutlinedButton(
                 onPressed: () {
                   MyLogger.entry("Calling _handleUpload()");
                   _handleUpload();
@@ -358,7 +359,7 @@ class _ControlsViewPageState extends State<ControlsViewPage> {
         const SizedBox(height: 8),
         Row(
           children: [
-            ElevatedButton(
+            OutlinedButton(
                 onPressed: () => Report.constructReportAndSend(activatedEvent,
                     onUploadDone: controlState.reportUploaded),
                 child: const Text("Resend Checkins")),
