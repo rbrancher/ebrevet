@@ -89,14 +89,15 @@ class _CheckinStatusPageState extends State<CheckinStatusPage>
                     return Center(
                       child: Card(
                         margin: const EdgeInsets.all(16),
-                        color: Colors.red.shade50,
+                        color: Theme.of(context).colorScheme.errorContainer,
                         child: Padding(
                           padding: const EdgeInsets.all(16.0),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.error_outline,
-                                  color: Colors.red, size: 48),
+                              Icon(Icons.error_outline,
+                                  color: Theme.of(context).colorScheme.error,
+                                  size: 48),
                               const SizedBox(height: 12),
                               Text(
                                 "Something went wrong",
@@ -104,17 +105,26 @@ class _CheckinStatusPageState extends State<CheckinStatusPage>
                                     .textTheme
                                     .titleMedium
                                     ?.copyWith(
-                                      color: Colors.red.shade700,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onErrorContainer,
                                     ),
                               ),
                               const SizedBox(height: 8),
                               Text(
                                 snapshot.error.toString(),
                                 textAlign: TextAlign.center,
-                                style: Theme.of(context).textTheme.bodyMedium,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium
+                                    ?.copyWith(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onErrorContainer,
+                                    ),
                               ),
                               const SizedBox(height: 12),
-                              ElevatedButton.icon(
+                              FilledButton.icon(
                                 onPressed: () {
                                   setState(() {
                                     _riderResults =

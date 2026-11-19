@@ -44,6 +44,7 @@ class RiderCheckinCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final comments = rider.extractComments();
     final numControls = event.controls.length;
+    final iconColor = Theme.of(context).colorScheme.onSurfaceVariant;
 
     String lastCheckInText = "None";
 
@@ -117,7 +118,7 @@ class RiderCheckinCard extends StatelessWidget {
                       }
                     }(),
                     size: 16,
-                    color: Colors.blueGrey,
+                    color: iconColor,
                   ),
                   const SizedBox(width: 6),
                   Text("Status: ${rider.result}"),
@@ -127,7 +128,7 @@ class RiderCheckinCard extends StatelessWidget {
                 const SizedBox(height: 2),
                 Row(
                   children: [
-                    const Icon(Icons.timer, size: 16, color: Colors.blueGrey),
+                    Icon(Icons.timer, size: 16, color: iconColor),
                     const SizedBox(width: 6),
                     Text("Elapsed Time: ${rider.formatElapsedHHMM()}"),
                   ],
@@ -157,7 +158,7 @@ class RiderCheckinCard extends StatelessWidget {
             if (comments.isNotEmpty) ...[
               Row(
                 children: [
-                  const Icon(Icons.comment, size: 16, color: Colors.blueGrey),
+                  Icon(Icons.comment, size: 16, color: iconColor),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(

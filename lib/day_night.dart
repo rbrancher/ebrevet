@@ -47,10 +47,10 @@ class DayNight extends ChangeNotifier {
         horizontal: tokens.spaceLarge, vertical: tokens.spaceSmall);
     return base.copyWith(
       extensions: <ThemeExtension<dynamic>>[tokens],
+      // Colors come from M3 defaults so FilledButton is primary and
+      // FilledButton.tonal is secondaryContainer.
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          backgroundColor: scheme.primary,
-          foregroundColor: scheme.onPrimary,
           shape: shape,
           padding: padding,
         ),

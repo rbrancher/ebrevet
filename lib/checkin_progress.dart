@@ -14,6 +14,15 @@ class CheckinProgress extends StatelessWidget {
       return const Text("No controls");
     }
 
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final completedColor = scheme.primary;
+    final onCompletedColor = scheme.onPrimary;
+    final remainingColor = scheme.surfaceContainerHighest;
+    final onRemainingColor = scheme.onSurfaceVariant;
+    final labelStyle =
+        theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.bold);
+
     return LayoutBuilder(
       builder: (context, constraints) {
         // final count = checklist!
@@ -38,8 +47,8 @@ class CheckinProgress extends StatelessWidget {
                     radius: radius,
                     width: maxWidth,
                     completed: completed,
-                    completedColor: Colors.green,
-                    remainingColor: Colors.grey.shade400,
+                    completedColor: completedColor,
+                    remainingColor: remainingColor,
                   ),
                 ),
               ),
@@ -50,15 +59,13 @@ class CheckinProgress extends StatelessWidget {
                     CircleAvatar(
                       radius: radius,
                       backgroundColor:
-                          i < checklist.length && checklist[i] != null
-                              ? Colors.green
-                              : Colors.grey.shade400,
+                          completed[i] ? completedColor : remainingColor,
                       child: Text(
                         "${i + 1}",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: radius * 0.9,
-                          fontWeight: FontWeight.bold,
+                        style: labelStyle?.copyWith(
+                          color: completed[i]
+                              ? onCompletedColor
+                              : onRemainingColor,
                         ),
                       ),
                     )

@@ -173,8 +173,10 @@ void main() {
             borderRadius: BorderRadius.circular(t.radius));
 
         final filled = theme.filledButtonTheme.style!;
-        expect(filled.backgroundColor!.resolve(none), s.primary);
-        expect(filled.foregroundColor!.resolve(none), s.onPrimary);
+        // AC9 (intent 0003): no color override, so FilledButton.tonal keeps
+        // its M3 secondaryContainer fill (see controls_screen_test.dart).
+        expect(filled.backgroundColor, isNull);
+        expect(filled.foregroundColor, isNull);
         expect(filled.shape!.resolve(none), shape);
 
         final outlined = theme.outlinedButtonTheme.style!;
