@@ -1,7 +1,7 @@
 ---
 id: "0003"
 title: Apply Material 3 tokens, status colors and button hierarchy to the controls and check-in screens
-status: draft
+status: approved
 requested_by: rbrancher
 issue: 2
 final_slice: false
@@ -9,6 +9,7 @@ priority: medium
 size: M
 risk: medium
 touches:
+  - lib/day_night.dart
   - lib/controls_view_page.dart
   - lib/control_card.dart
   - lib/checkin_progress.dart
@@ -63,13 +64,26 @@ button, so that I can see my next action in sun or at night.
 - [ ] AC6: Check-in logic is unchanged. The proximity radius, open/close window, skip
       rules, comment dialog, late flag, start/finish codes, persisted ride state and report
       posting are not edited. `git diff` for this slice touches only widget build code,
-      styles and the toast calls. A regression test checks that, with the mock location at
-      a control and the control open, tapping CHECK IN records the same check-in as before:
-      same `ActivatedEvent` outcome, and the mock report endpoint receives one POST.
+      styles and the toast calls. A regression test pumps the controls screen for an
+      activated mock event whose start control is open. `kMockMode` is false under
+      `flutter test`, so the test sets `RiderLocation.riderLocation = MockLocation.position`
+      and `lastLocationUpdate` directly, and wraps the test in
+      `http.runWithClient(..., MockServer.client)`. Tapping CHECK IN must leave exactly one
+      check-in recorded for that control index on the `ActivatedEvent`, and
+      `MockServer.receivedReports` must contain exactly one report with that
+      `control_index`.
 - [ ] AC7: A widget test pumps the controls screen for an activated mock event in light and
       dark with `textContrastGuideline` and `androidTapTargetGuideline`, and both pass for
       the cards and buttons on this screen.
 - [ ] AC8: The map icon in `map_icon_button.dart` uses `colorScheme.primary`.
+- [ ] AC9: `FilledButton.tonal` works. Slice (a)'s `filledButtonTheme` in `day_night.dart`
+      forces `backgroundColor: primary` on every `FilledButton`, which makes tonal buttons
+      look the same as primary ones. Remove that color override and keep only shape,
+      padding and text style; M3's defaults already give `FilledButton` the `primary`
+      color and `FilledButton.tonal` the `secondaryContainer` color. A widget test checks
+      that a `FilledButton` renders with `primary` and a `FilledButton.tonal` with
+      `secondaryContainer`, in light and dark. The slice (b) test that RIDE renders with
+      `primary` still passes.
 
 ## Out of scope
 - Slice (d), the final slice: settings, dialogs on other screens, certificate, log, the
