@@ -1,7 +1,7 @@
 ---
 id: "0005"
 title: Apply Material 3 tokens to settings, certificate, log, past events and side menu
-status: draft
+status: approved
 requested_by: rbrancher
 issue: 2
 final_slice: true
@@ -67,17 +67,23 @@ my finish certificate is easy to read and share.
 - [ ] AC5: Settings, past events and log pages pass `textContrastGuideline` and
       `androidTapTargetGuideline` in light and dark in a widget test using mock data.
 - [ ] AC6: `AppTokens` gains a distinct "pending upload" status pair (`pending`,
-      `onPending`) for both brightnesses. The control card shows it for a check-in that is
-      recorded but not yet posted, using the existing "is it posted" flag, with no new
-      logic. A unit test covers the pair in both brightnesses and a widget test shows the
-      pending color on a control with an unposted check-in.
+      `onPending`) for both brightnesses, built like the other custom colors from a fixed
+      orange source hue in `app_tokens.dart` (the old indicator was orange). Because the
+      control card draws it as an icon on the card surface, `pending` must reach at least
+      3:1 contrast against `surface` (WCAG non-text contrast), and `onPending` at least 4.5:1
+      against `pending`. It must differ visibly from `checkedIn` and `closingSoon`. The
+      control card shows it for a check-in that is recorded but not yet posted, using the
+      existing "is it posted" flag, with no new logic. A unit test covers the contrast
+      requirements in both brightnesses for the default seed and two others, and a widget
+      test shows the pending color on a control with an unposted check-in.
 - [ ] AC7: `AppTokens` gains a smaller numeric text style (same tabular figures feature)
       used by control card detail lines. A unit test checks the feature and size ordering
       against `numeric`.
-- [ ] AC8: The side menu is evaluated and kept as `Drawer` or moved to `NavigationDrawer`;
-      the choice and reasoning go in the PR description. Either way every menu entry keeps
-      its label, order and destination, and a widget test opens the drawer and finds each
-      entry.
+- [ ] AC8: The side menu is evaluated and kept as `Drawer` or moved to `NavigationDrawer`.
+      The choice and the reasoning go in a short comment at the top of `side_menu.dart`
+      and in the PR description. If the `Drawer` is kept, its header, spacing and text use
+      theme values only. Either way every menu entry keeps its label, order and destination,
+      and a widget test opens the drawer and finds each entry.
 - [ ] AC9: No behavior changes. Check-in rules, distance or time windows, codes, persisted
       state, settings keys and values, and reporting are not edited. The only logic
       touched in `control_card.dart` is reading the existing posted flag for AC6 and the
