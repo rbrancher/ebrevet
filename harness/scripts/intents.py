@@ -6,6 +6,8 @@ Usage:
   intents.py approved-changed BASE HEAD print intent paths whose status became 'approved' between two commits
   intents.py set-status FILE STATUS     rewrite the status field in place
   intents.py next-id                    print the next free 4-digit id
+  intents.py for-issue N                print intents linked to issue N: path, status, final_slice
+  intents.py field FILE KEY             print one frontmatter field
   intents.py index                      print a markdown table of all intents
 
 No third-party dependencies: the frontmatter subset used by intents is parsed by hand.
@@ -24,8 +26,10 @@ ENUMS = {
     "priority": {"low", "medium", "high"},
     "size": {"S", "M", "L"},
     "risk": {"low", "medium", "high"},
+    "final_slice": {"true", "false"},
 }
-REQUIRED_FIELDS = ["id", "title", "status", "requested_by", "issue", "priority", "size", "risk", "touches"]
+REQUIRED_FIELDS = ["id", "title", "status", "requested_by", "issue", "final_slice",
+                   "priority", "size", "risk", "touches"]
 REQUIRED_SECTIONS = ["Problem", "User story", "Acceptance criteria", "Out of scope", "Test plan"]
 NAME_RE = re.compile(r"^(\d{4})-[a-z0-9]+(-[a-z0-9]+)*\.md$")
 
@@ -140,12 +144,19 @@ def main(argv):
     elif cmd == "next-id":
         ids = [int(NAME_RE.match(p.name).group(1)) for p in all_intents()]
         print(f"{(max(ids) if ids else 0) + 1:04d}")
+    elif cmd == "for-issue":
+        for p in all_intents():
+            d, _ = load(p)
+            if str(d.get("issue")) == args[0]:
+                print(f"intents/{p.name}\t{d.get('status')}\t{d.get('final_slice')}")
+    elif cmd == "field":
+        print(load(args[0])[0].get(args[1], ""))
     elif cmd == "index":
-        print("| id | title | status | size | risk | issue |\n|---|---|---|---|---|---|")
+        print("| id | title | status | size | risk | issue | final |\n|---|---|---|---|---|---|---|")
         for p in all_intents():
             d, _ = load(p)
             print(f"| [{d.get('id')}]({p.name}) | {d.get('title')} | {d.get('status')} "
-                  f"| {d.get('size')} | {d.get('risk')} | {d.get('issue')} |")
+                  f"| {d.get('size')} | {d.get('risk')} | {d.get('issue')} | {d.get('final_slice')} |")
     else:
         sys.exit(__doc__)
 

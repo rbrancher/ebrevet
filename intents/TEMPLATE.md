@@ -4,6 +4,7 @@ title: Short imperative title
 status: draft            # draft | approved | in-progress | in-review | done | rejected | blocked
 requested_by: github-handle
 issue: null              # GitHub issue number, or null for hand-written intents
+final_slice: true        # false if more slices of the same issue will follow this one
 priority: medium         # low | medium | high
 size: S                  # S | M | L  (L should usually be split)
 risk: low                # low | medium | high  (high = touches check-in/codes/persistence)

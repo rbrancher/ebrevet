@@ -14,7 +14,21 @@ issue (feature form) ──maintainer adds `request` label──▶ triage.yml
    fix-loop.yml  (CI red or maintainer "@claude ..." ──▶ agent fixes, max 3 attempts, then `needs-human`)
         │
    GATE 2: human merges, and the intent ends up `status: done` on main
+        │
+   continue-slices.yml: if the intent has `final_slice: false`, re-run triage on the issue
+   ──▶ the next slice's intent PR (back to GATE 1). The last slice's PR closes the issue.
 ```
+
+## Multi-slice requests
+Triage splits a large request into slices, in order. Each intent's "Out of scope" section lists the
+slices still to come, and its `final_slice` field says whether more follow.
+- Non-final slices' PRs say `Refs #N`, so the issue stays open.
+- When one merges, `continue-slices.yml` dispatches triage again.
+- Triage drafts the next slice against the code that actually merged.
+- The final slice's PR says `Closes #N`.
+
+You can also re-trigger triage by hand with a `/triage` comment on the issue, or with
+`gh workflow run triage.yml -f issue=N`.
 
 ## One-time setup
 1. **Secrets:**

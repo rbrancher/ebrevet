@@ -14,7 +14,9 @@ Steps:
 6. Tick the acceptance-criteria checkboxes you satisfied in the intent file and set its status to `done`
    (`python3 harness/scripts/intents.py set-status <file> done`). It only becomes true on `main` when a human merges. Commit.
 7. Push and open a PR titled `<id>: <title>`. The body must contain:
-   - `Implements intents/<file>` and `Closes #<issue>` if the intent has an issue
+   - `Implements intents/<file>`
+   - if the intent has an issue: `Closes #<issue>` only when the intent has `final_slice: true`;
+     otherwise `Refs #<issue>` (more slices follow, the issue must stay open)
    - the acceptance-criteria checklist with the test that covers each one
    - what to click in the preview to see the feature
    - anything you were unsure about

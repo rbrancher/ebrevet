@@ -1,0 +1,38 @@
+name: continue-slices
+# When an agent PR for a non-final slice merges, re-run triage on its issue so the
+# next slice's intent PR appears for review (gate 1 still applies to every slice).
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+jobs:
+  next-slice:
+    if: >-
+      github.event.pull_request.merged == true &&
+      startsWith(github.event.pull_request.head.ref, 'agent/') &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Find the intent and dispatch triage for the next slice
+        run: |
+          slug="${{ github.event.pull_request.head.ref }}"; slug="${slug#agent/}"
+          file="intents/$slug.md"
+          [ -f "$file" ] || { echo "::notice::no intent file $file on main"; exit 0; }
+          issue=$(python3 harness/scripts/intents.py field "$file" issue)
+          final=$(python3 harness/scripts/intents.py field "$file" final_slice)
+          echo "intent=$file issue=$issue final_slice=$final"
+          if [ -z "$issue" ] || [ "$issue" = "null" ]; then echo "no linked issue"; exit 0; fi
+          if [ "$final" != "false" ]; then echo "final slice; nothing to continue"; exit 0; fi
+          gh issue comment "$issue" -R "${{ github.repository }}" \
+            --body "Slice \`$file\` merged in #${{ github.event.pull_request.number }}. Drafting the next slice."
+          gh workflow run triage.yml -R "${{ github.repository }}" -f issue="$issue"
