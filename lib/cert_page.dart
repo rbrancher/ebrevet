@@ -21,6 +21,8 @@ import 'package:confetti/confetti.dart';
 import 'package:shimmer/shimmer.dart';
 
 import 'activated_event.dart';
+import 'app_tokens.dart';
+import 'confetti_dialog.dart';
 import 'day_night.dart';
 import 'controls_view_page.dart';
 import 'control_state.dart';
@@ -59,6 +61,9 @@ class _CertificatePageState extends State<CertificatePage> {
   @override
   Widget build(BuildContext context) {
     var dayNight = context.watch<DayNight>();
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final tokens = AppTokens.of(context);
     var titleLarge = Theme.of(context)
         .textTheme
         .titleLarge
@@ -74,7 +79,9 @@ class _CertificatePageState extends State<CertificatePage> {
 
     const emStyle = TextStyle(fontStyle: FontStyle.italic);
 
-    var inversePrimary = Theme.of(context).colorScheme.inversePrimary;
+    // Same page background as the other screens; keeps TextButton (primary)
+    // text readable.
+    var pageBackground = scheme.primaryContainer;
 
     var gradientStart = Theme.of(context).colorScheme.surfaceBright;
     var gradientMid = Theme.of(context).colorScheme.surface;
@@ -122,7 +129,7 @@ class _CertificatePageState extends State<CertificatePage> {
         children: [
           // Main certificate content
           Container(
-            color: inversePrimary,
+            color: pageBackground,
             padding:
                 const EdgeInsets.symmetric(vertical: 16.0, horizontal: 16.0),
             child: Center(
@@ -144,10 +151,10 @@ class _CertificatePageState extends State<CertificatePage> {
                             color: border,
                             width: 2,
                           ),
-                          boxShadow: const [
+                          boxShadow: [
                             BoxShadow(
-                              color: Colors.blueAccent,
-                              offset: Offset(5, 5),
+                              color: scheme.primary,
+                              offset: const Offset(5, 5),
                               blurRadius: 10,
                             ),
                           ],
@@ -156,11 +163,11 @@ class _CertificatePageState extends State<CertificatePage> {
                         ),
                         child: Theme(
                           data: Theme.of(context).copyWith(
-                            textTheme: const TextTheme(
-                              bodyLarge:
-                                  TextStyle(fontSize: 20, color: Colors.blue),
-                              bodyMedium:
-                                  TextStyle(fontSize: 16, color: Colors.red),
+                            textTheme: textTheme.copyWith(
+                              bodyLarge: textTheme.titleMedium
+                                  ?.copyWith(color: scheme.onSurface),
+                              bodyMedium: textTheme.bodyLarge
+                                  ?.copyWith(color: scheme.onSurface),
                             ),
                           ),
                           child: Column(
@@ -171,14 +178,10 @@ class _CertificatePageState extends State<CertificatePage> {
                               ),
                               //Text('Finish Certificate', style: titleLarge),
                               Shimmer.fromColors(
-                                baseColor: Theme.of(context)
-                                    .colorScheme
-                                    .onSurface
-                                    .withAlpha(80), // ~30%
-                                highlightColor: Theme.of(context)
-                                    .colorScheme
-                                    .primary
-                                    .withAlpha(204), // ~80%
+                                // Both ends of the shimmer keep text
+                                // contrast against the certificate.
+                                baseColor: scheme.onSurface,
+                                highlightColor: scheme.primary,
                                 period: const Duration(
                                     seconds: 3), // speed of shimmer
                                 child: Text(
@@ -237,7 +240,19 @@ class _CertificatePageState extends State<CertificatePage> {
                                   ),
                                 ],
                               ),
-                              Text('Finish Code: $certString', style: emStyle),
+                              Text.rich(
+                                TextSpan(
+                                  text: 'Finish Code: ',
+                                  style: emStyle,
+                                  children: [
+                                    TextSpan(
+                                      text: certString,
+                                      style: tokens.numeric
+                                          .copyWith(color: scheme.onSurface),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -264,12 +279,7 @@ class _CertificatePageState extends State<CertificatePage> {
               confettiController: _confettiController,
               blastDirectionality: BlastDirectionality.explosive,
               shouldLoop: false,
-              colors: const [
-                Colors.blue,
-                Colors.red,
-                Colors.yellow,
-                Colors.green
-              ],
+              colors: confettiColors(context),
             ),
           ),
         ],

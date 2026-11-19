@@ -1,7 +1,7 @@
 ---
 id: "0005"
 title: Apply Material 3 tokens to settings, certificate, log, past events and side menu
-status: approved
+status: done
 requested_by: rbrancher
 issue: 2
 final_slice: true
@@ -45,28 +45,28 @@ like the rest of the app in light and dark mode, so that the whole app feels con
 my finish certificate is easy to read and share.
 
 ## Acceptance criteria
-- [ ] AC1: `cert_page.dart`, `confetti_dialog.dart`, `settings_page.dart`,
+- [x] AC1: `cert_page.dart`, `confetti_dialog.dart`, `settings_page.dart`,
       `settings_tiles.dart`, `log_page.dart`, `my_activated_events_page.dart`, `side_menu.dart`
       and `app_settings.dart` contain no `Colors.` (except `Colors.transparent`), `Color(0x`,
       `fontSize:` or `Flushbar`. The `baseline` map in `test/style_guardrail_test.dart` is
       emptied (`{}`) and the guardrail enforces zero for all of `lib/` outside the exempt
       files. The default theme seed becomes a named constant in `app_tokens.dart` with the
       same blue value, so the default look and any saved theme color do not change.
-- [ ] AC2: The certificate page takes colors from `colorScheme` and `AppTokens`, and text
+- [x] AC2: The certificate page takes colors from `colorScheme` and `AppTokens`, and text
       sizes from `textTheme`. The finish code uses `AppTokens.numeric` so its characters line
       up. The finish code text, certificate text and every displayed value are unchanged. A
       widget test pumps the certificate for a finished mock event in light and dark and
       finds the finish code string, with `textContrastGuideline` passing.
-- [ ] AC3: Confetti uses theme colors (primary, secondary, tertiary, and a status token)
+- [x] AC3: Confetti uses theme colors (primary, secondary, tertiary, and a status token)
       instead of fixed blue, red, yellow and green. A widget test pumps the dialog without
       error in light and dark.
-- [ ] AC4: The settings page and the Continue dialog have at most one `FilledButton` per
+- [x] AC4: The settings page and the Continue dialog have at most one `FilledButton` per
       screen (the confirming action). Other actions use `FilledButton.tonal`,
       `OutlinedButton` or `TextButton`. No `ElevatedButton` remains in `lib/`. A widget test
       counts `FilledButton`s and `ElevatedButton`s on the settings page in light and dark.
-- [ ] AC5: Settings, past events and log pages pass `textContrastGuideline` and
+- [x] AC5: Settings, past events and log pages pass `textContrastGuideline` and
       `androidTapTargetGuideline` in light and dark in a widget test using mock data.
-- [ ] AC6: `AppTokens` gains a distinct "pending upload" status pair (`pending`,
+- [x] AC6: `AppTokens` gains a distinct "pending upload" status pair (`pending`,
       `onPending`) for both brightnesses, built like the other custom colors from a fixed
       orange source hue in `app_tokens.dart` (the old indicator was orange). Because the
       control card draws it as an icon on the card surface, `pending` must reach at least
@@ -76,15 +76,15 @@ my finish certificate is easy to read and share.
       existing "is it posted" flag, with no new logic. A unit test covers the contrast
       requirements in both brightnesses for the default seed and two others, and a widget
       test shows the pending color on a control with an unposted check-in.
-- [ ] AC7: `AppTokens` gains a smaller numeric text style (same tabular figures feature)
+- [x] AC7: `AppTokens` gains a smaller numeric text style (same tabular figures feature)
       used by control card detail lines. A unit test checks the feature and size ordering
       against `numeric`.
-- [ ] AC8: The side menu is evaluated and kept as `Drawer` or moved to `NavigationDrawer`.
+- [x] AC8: The side menu is evaluated and kept as `Drawer` or moved to `NavigationDrawer`.
       The choice and the reasoning go in a short comment at the top of `side_menu.dart`
       and in the PR description. If the `Drawer` is kept, its header, spacing and text use
       theme values only. Either way every menu entry keeps its label, order and destination,
       and a widget test opens the drawer and finds each entry.
-- [ ] AC9: No behavior changes. Check-in rules, distance or time windows, codes, persisted
+- [x] AC9: No behavior changes. Check-in rules, distance or time windows, codes, persisted
       state, settings keys and values, and reporting are not edited. The only logic
       touched in `control_card.dart` is reading the existing posted flag for AC6 and the
       text style for AC7. The check-in regression test in `test/controls_screen_test.dart`

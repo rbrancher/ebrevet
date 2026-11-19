@@ -48,10 +48,7 @@ class SettingsPageState extends State<SettingsPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Settings',
-          //style: TextStyle(fontSize: 14),
-        ),
+        title: const Text('Settings'),
         actions: [
           IconButton(
               icon: dayNight.icon,
@@ -266,7 +263,7 @@ class _OptionalAppSettingsState extends State<OptionalAppSettings> {
                             "If your region is not in either the RUSA or Intl list, "
                             "try getting the latest region list from the server."),
                         spacerBox,
-                        ElevatedButton(
+                        FilledButton.tonal(
                           onPressed: () async {
                             await Region.fetchRegionsFromServer();
                             setState(() {});
@@ -326,7 +323,7 @@ class _AdvancedSettingsState extends State<AdvancedSettings> {
                   const SizedBox(
                     height: 16,
                   ),
-                  ElevatedButton(
+                  OutlinedButton(
                     onPressed: () =>
                         MySetting.clear().then((_) => widget.onClear()),
                     child: const Text('Clear All Settings'),
@@ -334,7 +331,7 @@ class _AdvancedSettingsState extends State<AdvancedSettings> {
                   const SizedBox(
                     height: 16,
                   ),
-                  ElevatedButton(
+                  OutlinedButton(
                     onPressed: () {
                       ScheduledEvents.clear();
                       sourceSelection.updateFromSettings();
@@ -418,7 +415,7 @@ class RequiredAppSettings extends StatelessWidget {
             },
           ),
           spacerBox,
-          ElevatedButton(onPressed: onContinue, child: const Text('Continue')),
+          FilledButton(onPressed: onContinue, child: const Text('Continue')),
         ],
       );
     }

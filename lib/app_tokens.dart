@@ -47,6 +47,15 @@ class AppTokens extends ThemeExtension<AppTokens> {
   /// Fixed source hues for custom status colors (M3 custom-color pattern).
   static const Color onTimeSource = Color(0xFF2E7D32); // green
   static const Color closingSoonSource = Color(0xFFFFB300); // amber
+  static const Color pendingSource = Color(0xFFF57C00); // orange
+
+  /// Default theme seed: the value of Material `Colors.blue`, so the default
+  /// look and any saved theme color are unchanged.
+  static const Color defaultSeed = Color(0xFF2196F3);
+
+  /// Minimum contrast of an icon-only status color against `surface`
+  /// (WCAG non-text contrast).
+  static const double minIconContrast = 3;
 
   final double spaceSmall;
   final double spaceMedium;
@@ -59,8 +68,15 @@ class AppTokens extends ThemeExtension<AppTokens> {
   final StatusColors checkedIn;
   final StatusColors dnf;
 
+  /// A check-in recorded on the device but not yet posted to the server.
+  /// `pending.color` is drawn as an icon on the card surface.
+  final StatusColors pending;
+
   /// Style for times, distances and codes, with tabular (fixed-width) digits.
   final TextStyle numeric;
+
+  /// Smaller [numeric] for card detail lines.
+  final TextStyle numericSmall;
 
   const AppTokens({
     this.spaceSmall = 8,
@@ -72,7 +88,9 @@ class AppTokens extends ThemeExtension<AppTokens> {
     required this.closed,
     required this.checkedIn,
     required this.dnf,
+    required this.pending,
     required this.numeric,
+    required this.numericSmall,
   });
 
   /// Minimum contrast for every status pair (WCAG AA for normal text).
@@ -87,14 +105,32 @@ class AppTokens extends ThemeExtension<AppTokens> {
       return StatusColors(s.primaryContainer, s.onPrimaryContainer);
     }
 
+    // Pending is shown as a bare icon, so it uses the orange scheme's
+    // primary (icon-strength against surface) rather than its container.
+    final orange = ColorScheme.fromSeed(
+        seedColor: pendingSource, brightness: scheme.brightness);
+
+    // ThemeData.textTheme holds colors only; Theme.of() merges in the M3
+    // sizes later, but extensions are not localized. Copy the M3 size so
+    // numeric and numericSmall have real, ordered sizes.
+    TextStyle tabular(TextStyle? role, TextStyle? geometry) =>
+        (role ?? const TextStyle()).copyWith(
+          fontSize: geometry?.fontSize,
+          height: geometry?.height,
+          letterSpacing: geometry?.letterSpacing,
+          fontFeatures: const [FontFeature.tabularFigures()],
+        );
+    const geometry = Typography.englishLike2021;
+
     return AppTokens(
       onTime: custom(onTimeSource),
       closingSoon: custom(closingSoonSource),
       closed: StatusColors(scheme.error, scheme.onError),
       checkedIn: StatusColors(scheme.primary, scheme.onPrimary),
       dnf: StatusColors(scheme.surface, scheme.onSurfaceVariant),
-      numeric: (textTheme.titleLarge ?? const TextStyle()).copyWith(
-          fontFeatures: const [FontFeature.tabularFigures()]),
+      pending: StatusColors(orange.primary, orange.onPrimary),
+      numeric: tabular(textTheme.titleLarge, geometry.titleLarge),
+      numericSmall: tabular(textTheme.bodyMedium, geometry.bodyMedium),
     );
   }
 
@@ -120,7 +156,9 @@ class AppTokens extends ThemeExtension<AppTokens> {
     StatusColors? closed,
     StatusColors? checkedIn,
     StatusColors? dnf,
+    StatusColors? pending,
     TextStyle? numeric,
+    TextStyle? numericSmall,
   }) =>
       AppTokens(
         spaceSmall: spaceSmall ?? this.spaceSmall,
@@ -132,7 +170,9 @@ class AppTokens extends ThemeExtension<AppTokens> {
         closed: closed ?? this.closed,
         checkedIn: checkedIn ?? this.checkedIn,
         dnf: dnf ?? this.dnf,
+        pending: pending ?? this.pending,
         numeric: numeric ?? this.numeric,
+        numericSmall: numericSmall ?? this.numericSmall,
       );
 
   @override
@@ -149,7 +189,9 @@ class AppTokens extends ThemeExtension<AppTokens> {
       closed: StatusColors.lerp(closed, other.closed, t),
       checkedIn: StatusColors.lerp(checkedIn, other.checkedIn, t),
       dnf: StatusColors.lerp(dnf, other.dnf, t),
+      pending: StatusColors.lerp(pending, other.pending, t),
       numeric: TextStyle.lerp(numeric, other.numeric, t)!,
+      numericSmall: TextStyle.lerp(numericSmall, other.numericSmall, t)!,
     );
   }
 }

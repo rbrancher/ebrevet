@@ -161,7 +161,7 @@ class _ControlCardState extends State<ControlCard> {
             ? Signature.checkInCode(activeEvent, control).wordText
             : Signature.forCert(activeEvent).xyText);
 
-    final numeric = AppTokens.of(context).numeric;
+    final numeric = AppTokens.of(context).numericSmall;
     final status = controlStatus();
     final statusText = controlStatusString();
 
@@ -314,13 +314,14 @@ class _ControlCardState extends State<ControlCard> {
       var lastUpload = activeEvent?.outcomes.lastUpload;
 
       final checkedInColor = AppTokens.of(context).checkedIn.color;
+      final pendingColor = AppTokens.of(context).pending.color;
       var checkInIcon = activeEvent == null
           ? Icon(Icons.check_box_outline_blank_outlined, color: checkedInColor)
           : ((lastUpload != null &&
                   (lastUpload.isAfter(checkInTime) ||
                       activeEvent.wasAutoChecked(control.index)))
               ? Icon(Icons.check_circle, color: checkedInColor)
-              : Icon(Icons.pending_sharp, color: checkedInColor));
+              : Icon(Icons.pending_sharp, color: pendingColor));
       checkInRow = Row(
         children: [
           const Text('Check In: '),
@@ -401,11 +402,12 @@ class _ControlCardState extends State<ControlCard> {
     // Can't check in -- already did (show time, uploaded/pending check etc..)
     if (checkInTime != null) {
       final checkedInColor = AppTokens.of(context).checkedIn.color;
+      final pendingColor = AppTokens.of(context).pending.color;
       var checkInIcon = (lastUpload != null &&
               (lastUpload.isAfter(checkInTime) ||
                   activeEvent.wasAutoChecked(c.index)))
           ? Icon(Icons.check_circle, color: checkedInColor)
-          : Icon(Icons.pending_sharp, color: checkedInColor);
+          : Icon(Icons.pending_sharp, color: pendingColor);
       return Column(
         children: [
           checkInIcon,
