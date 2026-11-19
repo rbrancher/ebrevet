@@ -1,5 +1,10 @@
 name: build-loop
 # Gate 1 has passed when an intent with `status: approved` lands on main (via a reviewed PR).
+#
+# claude-code-action does not run on `push` events, so this is two-stage:
+#   push to main  -> `dispatch` finds newly approved intents and starts one
+#                    workflow_dispatch run of this workflow per intent
+#   workflow_dispatch -> `implement` runs the agent for that one intent
 on:
   push:
     branches: [main]
@@ -11,34 +16,31 @@ on:
         required: true
 
 jobs:
-  find:
+  dispatch:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
-    outputs:
-      intents: ${{ steps.find.outputs.intents }}
+    permissions:
+      contents: read
+      actions: write
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - id: find
+      - name: Dispatch one implement run per newly approved intent
         run: |
-          if [ -n "${{ inputs.intent }}" ]; then
-            list="${{ inputs.intent }}"
-            grep -q '^status: approved' "$list" || { echo "::error::$list is not approved"; exit 1; }
-          else
-            list=$(python3 harness/scripts/intents.py approved-changed "${{ github.event.before }}" "${{ github.sha }}")
-          fi
-          echo "intents=$(printf '%s\n' $list | jq -Rnc '[inputs | select(length>0)]')" >> "$GITHUB_OUTPUT"
+          list=$(python3 harness/scripts/intents.py approved-changed "${{ github.event.before }}" "${{ github.sha }}")
+          if [ -z "$list" ]; then echo "No newly approved intents."; exit 0; fi
+          for f in $list; do
+            echo "Dispatching implement run for $f"
+            gh workflow run build-loop.yml -R "${{ github.repository }}" --ref main -f intent="$f"
+          done
 
   implement:
-    needs: find
-    if: needs.find.outputs.intents != '[]'
-    strategy:
-      max-parallel: 1
-      fail-fast: false
-      matrix:
-        intent: ${{ fromJSON(needs.find.outputs.intents) }}
+    if: github.event_name == 'workflow_dispatch'
     concurrency:
-      group: implement-${{ matrix.intent }}
+      group: implement-${{ inputs.intent }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
@@ -53,21 +55,32 @@ jobs:
           channel: stable
           flutter-version: 3.35.7
           cache: true
+      - name: Check intent is approved
+        env:
+          INTENT: ${{ inputs.intent }}
+        run: |
+          case "$INTENT" in intents/[0-9][0-9][0-9][0-9]-*.md) ;; *) echo "::error::bad intent path"; exit 1;; esac
+          [ -f "$INTENT" ] || { echo "::error::$INTENT not found"; exit 1; }
+          grep -q '^status: approved' "$INTENT" || { echo "::error::$INTENT is not approved"; exit 1; }
       - name: Prepare branch
         id: prep
+        env:
+          INTENT: ${{ inputs.intent }}
         run: |
-          slug=$(basename "${{ matrix.intent }}" .md)
+          slug=$(basename "$INTENT" .md)
           echo "branch=agent/$slug" >> "$GITHUB_OUTPUT"
           git checkout -b "agent/$slug"
           cp harness/ci/region_data.stub.dart lib/region_data.dart
           flutter pub get
       - id: prompt
+        env:
+          INTENT: ${{ inputs.intent }}
         run: |
           {
             echo 'text<<__EOF__'
             cat harness/prompts/implement.md
             echo
-            echo "Intent file: ${{ matrix.intent }}. Branch: ${{ steps.prep.outputs.branch }}."
+            echo "Intent file: $INTENT. Branch: ${{ steps.prep.outputs.branch }}."
             echo '__EOF__'
           } >> "$GITHUB_OUTPUT"
       - uses: anthropics/claude-code-action@v1
