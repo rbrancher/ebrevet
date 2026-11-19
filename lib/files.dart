@@ -18,13 +18,19 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'mylogger.dart';
 
 class FileStorage {
   String fileName;
 
   FileStorage(this.fileName);
+
+  // dart:io files are unavailable on web; persist to browser storage
+  // (via shared_preferences) under this key instead.
+  String get _webKey => 'file:$fileName';
 
   Future<String> get _localPath async {
     final directory = await getApplicationDocumentsDirectory();
@@ -38,6 +44,10 @@ class FileStorage {
   }
 
   void clear() async {
+    if (kIsWeb) {
+      (await SharedPreferences.getInstance()).remove(_webKey);
+      return;
+    }
     try {
       final file = await _localFile;
       await file.delete();
@@ -48,6 +58,10 @@ class FileStorage {
 
   Future<Map<String, dynamic>> readJSON() async {
     try {
+      if (kIsWeb) {
+        final s = (await SharedPreferences.getInstance()).getString(_webKey);
+        return (s == null) ? {} : jsonDecode(s) as Map<String, dynamic>;
+      }
       final file = await _localFile;
       final contents = await file.readAsString();
       var decodedResult = jsonDecode(contents) as Map<String, dynamic>;
@@ -61,6 +75,10 @@ class FileStorage {
 
   Future<bool> writeJSON(Map<String, dynamic> contents) async {
     try {
+      if (kIsWeb) {
+        return (await SharedPreferences.getInstance())
+            .setString(_webKey, jsonEncode(contents));
+      }
       final file = await _localFile;
 
       var jsonData = jsonEncode(contents); //,

@@ -20,6 +20,8 @@ import 'control.dart';
 import 'exception.dart';
 import 'app_settings.dart';
 import 'mylogger.dart';
+import 'mock/mock_mode.dart';
+import 'mock/mock_location.dart';
 
 class RiderLocation {
   static Position? riderLocation;
@@ -31,6 +33,10 @@ class RiderLocation {
     String? locError;
     LocationPermission permission;
     MyLogger.entry('Checking Location permissions...');
+    if (kMockMode) {
+      gpsServiceEnabled = true;
+      return null;
+    }
     try {
       gpsServiceEnabled = await Geolocator.isLocationServiceEnabled();
       if (gpsServiceEnabled == false) {
@@ -67,6 +73,12 @@ class RiderLocation {
   // Perhaps as settings option with different period
 
   static Future<String?> updateLocation() async {
+    if (kMockMode) {
+      gpsServiceEnabled = true;
+      riderLocation = MockLocation.position;
+      lastLocationUpdate = DateTime.now();
+      return null;
+    }
     try {
       gpsServiceEnabled = await Geolocator.isLocationServiceEnabled();
       if (gpsServiceEnabled == false) {

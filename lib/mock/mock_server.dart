@@ -1,0 +1,145 @@
+// Fake eBrevet server for mock mode (web previews, tests).
+//
+// Installed with http.runWithClient in main.dart, so all existing
+// http.get / http.post calls are routed here without code changes.
+
+import 'dart:convert';
+
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+
+import '../region.dart';
+import '../scheduled_events.dart';
+
+class MockServer {
+  static const fixtureAsset = 'assets/mock/future_events.json';
+  static const checkinPostURL = 'https://mock.ebrevet.invalid/checkin';
+
+  /// Every check-in report POSTed in this session (newest last).
+  static final List<Map<String, dynamic>> receivedReports = [];
+
+  /// Override the fixture (tests). Defaults to loading [fixtureAsset].
+  static Future<String> Function() loadFixture =
+      () => rootBundle.loadString(fixtureAsset);
+
+  /// Secret used to sign event feeds. Defaults to the secret the app
+  /// will verify with, so the signature check passes.
+  static String Function() signingSecret =
+      () => ScheduledEventsSource.fromSettingsSourceID().secret as String;
+
+  /// Clock, overridable in tests.
+  static DateTime Function() now = DateTime.now;
+
+  /// Real client for same-origin requests (e.g. package_info_plus fetching
+  /// version.json on web). Must be created outside http.runWithClient.
+  static http.Client? passthrough;
+
+  static http.Client client() => MockClient(handle);
+
+  static bool _isSameOrigin(Uri url) =>
+      Uri.base.hasScheme &&
+      Uri.base.scheme.startsWith('http') &&
+      url.origin == Uri.base.origin;
+
+  static Future<http.Response> handle(http.Request request) async {
+    final path = request.url.pathSegments;
+    if (passthrough != null && _isSameOrigin(request.url)) {
+      // The handler's request is already finalized; send a fresh copy.
+      final copy = http.Request(request.method, request.url)
+        ..headers.addAll(request.headers)
+        ..bodyBytes = request.bodyBytes;
+      return http.Response.fromStream(await passthrough!.send(copy));
+    }
+    try {
+      if (request.method == 'POST') {
+        return _checkin(request);
+      }
+      if (path.contains('region_list')) {
+        return _json(_regionList());
+      }
+      final i = path.indexOf('scheduled_events');
+      if (i >= 0) {
+        // .../scheduled_events/<regionID>[/<nonce>]
+        final nonce = (path.length > i + 2) ? path[i + 2] : null;
+        return _json(await scheduledEvents(nonce: nonce));
+      }
+      return http.Response('Not found in mock server: ${request.url}', 404);
+    } catch (e) {
+      return http.Response('Mock server error: $e', 500);
+    }
+  }
+
+  static http.Response _json(Object body) => http.Response(
+        jsonEncode(body),
+        200,
+        headers: {'content-type': 'application/json; charset=utf-8'},
+      );
+
+  static http.Response _checkin(http.Request request) {
+    final report = jsonDecode(request.body) as Map<String, dynamic>;
+    receivedReports.add(report);
+    return _json({'status': 'OK', 'mock': true});
+  }
+
+  static Map<String, dynamic> _regionList() => {
+        'timestamp': now().toUtc().toIso8601String(),
+        'region_list': [
+          for (final e in Region.regionMap.entries)
+            {...e.value, 'club_acp_code': e.key},
+        ],
+      };
+
+  /// The signed scheduled-events feed, with the fixture's dates moved so the
+  /// first event started 20 minutes ago and event i starts i days from now.
+  static Future<Map<String, dynamic>> scheduledEvents({String? nonce}) async {
+    final fixture = jsonDecode(await loadFixture()) as Map<String, dynamic>;
+    final events = (fixture['event_list'] as List).cast<Map<String, dynamic>>();
+    final t0 = now().toUtc();
+
+    final shifted = <Map<String, dynamic>>[];
+    for (var i = 0; i < events.length; i++) {
+      final target = (i == 0)
+          ? t0.subtract(const Duration(minutes: 20))
+          : t0.add(Duration(days: i));
+      shifted.add(shiftEvent(events[i], target));
+    }
+
+    final feed = <String, dynamic>{
+      'minimum_app_version': '0.0.0',
+      'event_list': shifted,
+      'event_errors': <String>[],
+      'nonce': nonce ?? 'nononce',
+      'timestamp': t0.toIso8601String(),
+    };
+    feed['signature'] = ScheduledEvents.signJson(feed, signingSecret());
+    return feed;
+  }
+
+  /// Copy [event] so it starts at [newStart], moving every control window by
+  /// the same offset, and fill fields the legacy fixture lacks.
+  static Map<String, dynamic> shiftEvent(
+      Map<String, dynamic> event, DateTime newStart) {
+    final e = jsonDecode(jsonEncode(event)) as Map<String, dynamic>;
+    final oldStart = DateTime.parse(e['start_datetime_utc']);
+    final delta = newStart.difference(oldStart);
+    String move(String iso) =>
+        DateTime.parse(iso).add(delta).toUtc().toIso8601String();
+
+    e['start_datetime_utc'] = move(e['start_datetime_utc']);
+    if (e['end_datetime_utc'] != null) {
+      e['end_datetime_utc'] = move(e['end_datetime_utc']);
+    }
+    final local = newStart.toLocal();
+    e['start_datetime_at_event'] =
+        '${local.toIso8601String().substring(0, 16).replaceFirst('T', ' ')} ${local.timeZoneName}';
+    for (final c in (e['controls'] as List).cast<Map<String, dynamic>>()) {
+      c['open'] = move(c['open']);
+      c['close'] = move(c['close']);
+    }
+    e['gravel_distance'] ??= '0';
+    e['checkin_post_url'] = checkinPostURL;
+    e['name'] = '[MOCK] ${(e['name'] as String).trim()}';
+    return e;
+  }
+}

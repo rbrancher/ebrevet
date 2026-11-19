@@ -1,0 +1,88 @@
+name: fix-loop
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+  issue_comment:
+    types: [created]
+
+env:
+  MAX_FIX_ATTEMPTS: 3
+
+jobs:
+  fix:
+    if: >-
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'failure' &&
+       github.event.workflow_run.event == 'pull_request' &&
+       startsWith(github.event.workflow_run.head_branch, 'agent/')) ||
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request &&
+       contains(github.event.comment.body, '@claude') &&
+       contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    concurrency:
+      group: fix-${{ github.event.workflow_run.head_branch || github.event.issue.number }}
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: read
+      id-token: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Resolve PR and attempt budget
+        id: ctx
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            branch="${{ github.event.workflow_run.head_branch }}"
+            pr=$(gh pr list -R "${{ github.repository }}" --head "$branch" --json number -q '.[0].number')
+            reason="CI failed. Inspect the failing run with: gh run view ${{ github.event.workflow_run.id }} --log-failed"
+          else
+            pr="${{ github.event.issue.number }}"
+            branch=$(gh pr view -R "${{ github.repository }}" "$pr" --json headRefName -q .headRefName)
+            reason="Maintainer comment: read it with gh pr view $pr --comments (comment id ${{ github.event.comment.id }})."
+          fi
+          case "$branch" in agent/*) ;; *) echo "not an agent branch"; echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0;; esac
+          attempts=$(gh pr view -R "${{ github.repository }}" "$pr" --json comments \
+            -q '[.comments[].body | select(contains("<!-- fix-attempt -->"))] | length')
+          if [ "${{ github.event_name }}" = "workflow_run" ] && [ "$attempts" -ge "$MAX_FIX_ATTEMPTS" ]; then
+            gh pr edit -R "${{ github.repository }}" "$pr" --add-label needs-human
+            gh pr comment -R "${{ github.repository }}" "$pr" --body "Fix budget ($MAX_FIX_ATTEMPTS) exhausted; needs a human."
+            echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          gh pr comment -R "${{ github.repository }}" "$pr" --body "<!-- fix-attempt --> Fix attempt $((attempts+1)) started."
+          { echo "pr=$pr"; echo "branch=$branch"; echo "reason=$reason"; } >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        if: steps.ctx.outputs.skip != 'true'
+        with:
+          ref: ${{ steps.ctx.outputs.branch }}
+      - uses: subosito/flutter-action@v2
+        if: steps.ctx.outputs.skip != 'true'
+        with:
+          channel: stable
+          flutter-version: 3.35.7
+          cache: true
+      - if: steps.ctx.outputs.skip != 'true'
+        run: cp harness/ci/region_data.stub.dart lib/region_data.dart && flutter pub get
+      - id: prompt
+        if: steps.ctx.outputs.skip != 'true'
+        run: |
+          {
+            echo 'text<<__EOF__'
+            cat harness/prompts/fix.md
+            echo
+            echo "PR: ${{ steps.ctx.outputs.pr }} on branch ${{ steps.ctx.outputs.branch }}."
+            echo "${{ steps.ctx.outputs.reason }}"
+            echo '__EOF__'
+          } >> "$GITHUB_OUTPUT"
+      - uses: anthropics/claude-code-action@v1
+        if: steps.ctx.outputs.skip != 'true'
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: ${{ steps.prompt.outputs.text }}
+          claude_args: >-
+            --model ${{ vars.IMPLEMENT_MODEL || 'claude-opus-5-5' }}
+            --max-turns 80
+            --allowedTools "Read,Glob,Grep,Write,Edit,Bash(flutter:*),Bash(dart:*),Bash(git:*),Bash(gh pr view:*),Bash(gh pr comment:*),Bash(gh run view:*)"
+            --disallowedTools "Bash(git push --force:*),WebFetch,WebSearch"
