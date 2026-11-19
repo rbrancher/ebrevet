@@ -49,8 +49,22 @@ import 'control_state.dart';
 import 'my_settings.dart';
 import 'event_list_page.dart';
 import 'region.dart';
+import 'package:http/http.dart' as http;
+import 'mock/mock_mode.dart';
+import 'mock/mock_server.dart';
 
 void main() {
+  if (kMockMode) {
+    // All package:http traffic goes to the in-app fake server, except
+    // same-origin asset requests, which use a real client made out here.
+    MockServer.passthrough = http.Client();
+    http.runWithClient(_start, MockServer.client);
+  } else {
+    _start();
+  }
+}
+
+void _start() {
   initSettings().then((_) {
     MyLogger.entry("** runApp(MyApp)");
     runApp(
@@ -77,6 +91,12 @@ Future<void> initSettings() async {
 
   await MySetting.initSharedPreferences();
   await AppSettings.initializePackageInfo();
+  if (kMockMode && !AppSettings.isRusaIDSet) {
+    // Previews land straight on the event list with a demo rider.
+    await AppSettings.firstName.setValue('Mock');
+    await AppSettings.lastName.setValue('Rider');
+    await AppSettings.rusaID.setValue('12345');
+  }
   // await AppSettings.initializeMySettings();
   await Region.fetchRegionsFromDisk(
       create: true); // will create from compiled static if missing
@@ -111,7 +131,16 @@ class MyApp extends StatelessWidget {
         theme: dayNight.dayTheme,
         darkTheme: dayNight.nightTheme,
         themeMode: dayNight.mode,
-        home: UpgradeAlert(child: const ScheduledEventsPage()),
+        home: kMockMode
+            ? const ScheduledEventsPage()
+            : UpgradeAlert(child: const ScheduledEventsPage()),
+        builder: kMockMode
+            ? (context, child) => Banner(
+                  message: 'MOCK',
+                  location: BannerLocation.topEnd,
+                  child: child!,
+                )
+            : null,
       );
     });
   }

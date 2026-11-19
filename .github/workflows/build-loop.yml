@@ -1,0 +1,88 @@
+name: build-loop
+# Gate 1 has passed when an intent with `status: approved` lands on main (via a reviewed PR).
+on:
+  push:
+    branches: [main]
+    paths: ['intents/**']
+  workflow_dispatch:
+    inputs:
+      intent:
+        description: 'Path to an approved intent, e.g. intents/0001-foo.md'
+        required: true
+
+jobs:
+  find:
+    runs-on: ubuntu-latest
+    outputs:
+      intents: ${{ steps.find.outputs.intents }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: find
+        run: |
+          if [ -n "${{ inputs.intent }}" ]; then
+            list="${{ inputs.intent }}"
+            grep -q '^status: approved' "$list" || { echo "::error::$list is not approved"; exit 1; }
+          else
+            list=$(python3 harness/scripts/intents.py approved-changed "${{ github.event.before }}" "${{ github.sha }}")
+          fi
+          echo "intents=$(printf '%s\n' $list | jq -Rnc '[inputs | select(length>0)]')" >> "$GITHUB_OUTPUT"
+
+  implement:
+    needs: find
+    if: needs.find.outputs.intents != '[]'
+    strategy:
+      max-parallel: 1
+      fail-fast: false
+      matrix:
+        intent: ${{ fromJSON(needs.find.outputs.intents) }}
+    concurrency:
+      group: implement-${{ matrix.intent }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.35.7
+          cache: true
+      - name: Prepare branch
+        id: prep
+        run: |
+          slug=$(basename "${{ matrix.intent }}" .md)
+          echo "branch=agent/$slug" >> "$GITHUB_OUTPUT"
+          git checkout -b "agent/$slug"
+          cp harness/ci/region_data.stub.dart lib/region_data.dart
+          flutter pub get
+      - id: prompt
+        run: |
+          {
+            echo 'text<<__EOF__'
+            cat harness/prompts/implement.md
+            echo
+            echo "Intent file: ${{ matrix.intent }}. Branch: ${{ steps.prep.outputs.branch }}."
+            echo '__EOF__'
+          } >> "$GITHUB_OUTPUT"
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: ${{ steps.prompt.outputs.text }}
+          claude_args: >-
+            --model ${{ vars.IMPLEMENT_MODEL || 'claude-opus-5-5' }}
+            --max-turns 150
+            --allowedTools "Read,Glob,Grep,Write,Edit,Bash(flutter:*),Bash(dart:*),Bash(python3 harness/scripts/intents.py:*),Bash(git:*),Bash(gh pr create:*),Bash(gh pr view:*)"
+            --disallowedTools "Bash(git push origin main:*),Bash(git push --force:*),WebFetch,WebSearch"
+      - name: Guardrail - protected paths untouched
+        if: always()
+        run: |
+          git fetch origin main
+          if git diff --name-only origin/main...HEAD | grep -E '^(\.github/|harness/|android/key\.properties|lib/region_data\.dart)'; then
+            echo "::error::Agent modified protected paths"; exit 1
+          fi

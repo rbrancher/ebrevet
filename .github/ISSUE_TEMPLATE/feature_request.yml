@@ -1,0 +1,30 @@
+name: Feature request
+description: Ask for a change to eBrevet. A maintainer labels it `request` to send it to AI triage.
+title: "[Request] "
+body:
+  - type: dropdown
+    id: role
+    attributes:
+      label: I am a...
+      options: [Rider, Organizer / RBA, Volunteer, Other]
+    validations: {required: true}
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you hitting?
+      description: Describe the situation on a ride or when organizing, not the solution.
+    validations: {required: true}
+  - type: textarea
+    id: want
+    attributes:
+      label: What would you like the app to do?
+    validations: {required: true}
+  - type: textarea
+    id: done
+    attributes:
+      label: How would we know it works?
+      description: Concrete examples help the triage agent write testable acceptance criteria.
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else (screenshots, links)

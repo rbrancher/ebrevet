@@ -1,0 +1,46 @@
+name: triage
+# Gate 0: only a maintainer-applied `request` label (or a maintainer `/triage` comment) starts triage.
+on:
+  issues:
+    types: [labeled]
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: triage-${{ github.event.issue.number }}
+
+jobs:
+  triage:
+    if: >-
+      !github.event.issue.pull_request && (
+        (github.event_name == 'issues' && github.event.label.name == 'request') ||
+        (github.event_name == 'issue_comment' && startsWith(github.event.comment.body, '/triage') &&
+         contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - id: prompt
+        run: |
+          {
+            echo 'text<<__EOF__'
+            cat harness/prompts/triage.md
+            echo
+            echo "Repository: ${{ github.repository }}. Issue number: ${{ github.event.issue.number }}."
+            echo "Read the issue with: gh issue view ${{ github.event.issue.number }} --comments"
+            echo '__EOF__'
+          } >> "$GITHUB_OUTPUT"
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: ${{ steps.prompt.outputs.text }}
+          claude_args: >-
+            --model ${{ vars.TRIAGE_MODEL || 'claude-sonnet-5-5' }}
+            --max-turns 40
+            --allowedTools "Read,Glob,Grep,Write,Edit,Bash(python3 harness/scripts/intents.py:*),Bash(git:*),Bash(gh issue view:*),Bash(gh issue comment:*),Bash(gh pr create:*)"

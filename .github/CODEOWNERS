@@ -1,0 +1,5 @@
+# Changes to the harness, workflows and intent specs need maintainer approval.
+/.github/   @rbrancher
+/harness/   @rbrancher
+/intents/   @rbrancher
+/CLAUDE.md  @rbrancher
