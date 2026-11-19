@@ -88,16 +88,7 @@ void main() {
             StatusColors(amber.primaryContainer, amber.onPrimaryContainer));
         expect(t.closed, StatusColors(s.error, s.onError));
         expect(t.checkedIn, StatusColors(s.primary, s.onPrimary));
-        // DNF is outline on surface; in light mode the standard outline is
-        // under 4.5:1, so the medium-contrast scheme's outline is used.
-        final outline = brightness == Brightness.dark
-            ? s.outline
-            : ColorScheme.fromSeed(
-                    seedColor: Colors.blue,
-                    brightness: brightness,
-                    contrastLevel: 0.5)
-                .outline;
-        expect(t.dnf, StatusColors(s.surface, outline));
+        expect(t.dnf, StatusColors(s.surface, s.onSurfaceVariant));
       });
 
       for (final seed in seeds) {

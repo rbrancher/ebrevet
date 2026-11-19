@@ -79,10 +79,8 @@ class AppTokens extends ThemeExtension<AppTokens> {
   static const double minContrast = 4.5;
 
   /// Builds tokens for [scheme] (whose brightness selects light or dark
-  /// status pairs) and [textTheme]. [seedColor] must be the seed [scheme]
-  /// was made from.
-  factory AppTokens.fromScheme(ColorScheme scheme, TextTheme textTheme,
-      {required Color seedColor}) {
+  /// status pairs) and [textTheme].
+  factory AppTokens.fromScheme(ColorScheme scheme, TextTheme textTheme) {
     StatusColors custom(Color source) {
       final s =
           ColorScheme.fromSeed(seedColor: source, brightness: scheme.brightness);
@@ -94,25 +92,10 @@ class AppTokens extends ThemeExtension<AppTokens> {
       closingSoon: custom(closingSoonSource),
       closed: StatusColors(scheme.error, scheme.onError),
       checkedIn: StatusColors(scheme.primary, scheme.onPrimary),
-      dnf: StatusColors(scheme.surface, _dnfOutline(scheme, seedColor)),
+      dnf: StatusColors(scheme.surface, scheme.onSurfaceVariant),
       numeric: (textTheme.titleLarge ?? const TextStyle()).copyWith(
           fontFeatures: const [FontFeature.tabularFigures()]),
     );
-  }
-
-  /// The `outline` role, for DNF text on `surface`. A standard light scheme's
-  /// outline is about 4.3:1 on surface, so when it is below [minContrast] the
-  /// outline of the M3 medium-contrast scheme (contrastLevel 0.5) for the same
-  /// seed is used instead.
-  static Color _dnfOutline(ColorScheme scheme, Color seedColor) {
-    if (contrastRatio(scheme.outline, scheme.surface) >= minContrast) {
-      return scheme.outline;
-    }
-    return ColorScheme.fromSeed(
-            seedColor: seedColor,
-            brightness: scheme.brightness,
-            contrastLevel: 0.5)
-        .outline;
   }
 
   /// WCAG 2 contrast ratio between two opaque colors.

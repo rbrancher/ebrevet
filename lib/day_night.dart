@@ -40,7 +40,7 @@ class DayNight extends ChangeNotifier {
           ColorScheme.fromSeed(brightness: brightness, seedColor: _color),
     );
     final scheme = base.colorScheme;
-    final tokens = AppTokens.fromScheme(scheme, base.textTheme, seedColor: _color);
+    final tokens = AppTokens.fromScheme(scheme, base.textTheme);
     final shape = RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(tokens.radius));
     final padding = EdgeInsets.symmetric(

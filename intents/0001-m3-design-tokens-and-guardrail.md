@@ -51,15 +51,15 @@ its own look.
       tokens or color roles. The only `lib/` files changed are `day_night.dart`,
       `main.dart` (only if needed for wiring) and
       `app_smoke_test.dart` still passes.
-- [x] AC6: A guardrail test, `test/style_guardraid fails on
+- [x] AC6: A guardrail test, `test/style_guardrail_test.dart`, scans `lib/` and fails on
       `Colors.` (except `Colors.transparent`), `Color(0x`, `fontSize:` and `Flushbar`.
-      It exempts `lib/day_night.dart` and `lib/ap
+      It exempts `lib/day_night.dart` and `lib/app_tokens.dart`.
       Today's violations are recorded in a per-file baseline list in the test. A file
       fails if its count exceeds its baseline, anany.
       Baseline counts may only go down. A PR that raises any baseline must say why in
       its description.
 - [x] AC7: The guardrail's scanning function is unit tested against in-memory sample
-      sources. A sample that adds a hard-coded cohbar` is
+      sources. A sample that adds a hard-coded color, a `fontSize:` or a `Flushbar` is
       reported, and a sample using only `colorScheme` roles passes.
 - [x] AC8: `AppTokens` provides a `numeric` text . It is
       based on `textTheme.titleLarge` with `FontFeature.tabularFigures()`. A unit test
