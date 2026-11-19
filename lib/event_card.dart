@@ -127,11 +127,7 @@ class _EventCardState extends State<EventCard> {
             ),
             title: Text(
               event.nameDist,
-              style: TextStyle(
-                fontSize:
-                    Theme.of(context).primaryTextTheme.bodyLarge?.fontSize ??
-                        16,
-              ),
+              style: Theme.of(context).textTheme.titleMedium,
             ),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -287,14 +283,11 @@ class _EventCardState extends State<EventCard> {
 
     if (buttonText == null) return const SizedBox.shrink(); // No button
 
-    return ElevatedButton(
-      // style: TextButton.styleFrom(
-      //   padding: EdgeInsets.zero,
-      // ),
+    return FilledButton(
       onPressed: () async {
         if (AppSettings.isRusaIDSet == false) {
-          FlushbarGlobal.show("Can't RIDE. Rider ID not set.",
-              style: FlushbarStyle.error);
+          AppSnack.show("Can't RIDE. Rider ID not set.",
+              style: AppSnackStyle.error);
         } else {
           // If we did not (yet) start, then validate start.
 
@@ -309,7 +302,7 @@ class _EventCardState extends State<EventCard> {
                   onEventsUpdated?.call();
                 }
               } else {
-                FlushbarGlobal.show(msg);
+                AppSnack.show(msg);
               }
               return;
             }
@@ -326,14 +319,14 @@ class _EventCardState extends State<EventCard> {
             } else {
               // Starting event (unless not allowed)
               if (isPreride && !event.isPreridable) {
-                FlushbarGlobal.show("Can't Pre Ride now.",
-                    style: FlushbarStyle.error);
+                AppSnack.show("Can't Pre Ride now.",
+                    style: AppSnackStyle.error);
                 return;
               }
 
               if (!isPreride && !event.isStartable) {
-                FlushbarGlobal.show("Can't start now.",
-                    style: FlushbarStyle.error);
+                AppSnack.show("Can't start now.",
+                    style: AppSnackStyle.error);
                 return;
               }
 
@@ -362,7 +355,7 @@ class _EventCardState extends State<EventCard> {
                         checkInTime: event
                             .startTimeWindow.onTime, // check in time override
                       )
-                      .then((foo) => FlushbarGlobal.show(
+                      .then((foo) => AppSnack.show(
                           "Mass Start Control Check In at "
                           "${Utility.toBriefTimeString(event.startTimeWindow.onTime!.toLocal())}"));
                   break;
@@ -382,7 +375,7 @@ class _EventCardState extends State<EventCard> {
                                 "${activatedEvent!.startStyle.description}. Automatic Check In",
                             controlState: controlState,
                           )
-                          .then((foo) => FlushbarGlobal.show(
+                          .then((foo) => AppSnack.show(
                               "Automatic Start Control Check In at "
                               "${Utility.toBriefTimeString(event.startTimeWindow.onTime!.toLocal())}"));
                     }
@@ -476,10 +469,10 @@ class _EventCardState extends State<EventCard> {
               });
 
               try {
-                FlushbarGlobal.show(
+                AppSnack.show(
                   'Updating events for ${sourceSelection.eventInfoSource.fullDescription}... '
                   '(This may take a few seconds.)',
-                  style: FlushbarStyle.info,
+                  style: AppSnackStyle.info,
                 );
 
                 await ScheduledEvents.refreshScheduledEventsFromServer(
@@ -545,7 +538,7 @@ class _EventCardState extends State<EventCard> {
                                 ?.copyWith(fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 8),
-                          ElevatedButton.icon(
+                          OutlinedButton.icon(
                             onPressed: updatingEvents ? null : runUpdate,
                             icon: const Icon(Icons.refresh),
                             label: const Text('Update event data'),
@@ -586,10 +579,10 @@ class _EventCardState extends State<EventCard> {
               });
 
               try {
-                FlushbarGlobal.show(
+                AppSnack.show(
                   'Updating events for ${sourceSelection.eventInfoSource.fullDescription}... '
                   '(This may take a few seconds.)',
-                  style: FlushbarStyle.info,
+                  style: AppSnackStyle.info,
                 );
 
                 await ScheduledEvents.refreshScheduledEventsFromServer(
@@ -657,7 +650,7 @@ class _EventCardState extends State<EventCard> {
                                   ?.copyWith(fontWeight: FontWeight.bold),
                             ),
                             const SizedBox(height: 8),
-                            ElevatedButton.icon(
+                            OutlinedButton.icon(
                               onPressed: updatingEvents ? null : runUpdate,
                               icon: const Icon(Icons.refresh),
                               label: const Text('Update event data'),
@@ -725,11 +718,11 @@ class _EventCardState extends State<EventCard> {
   //                   const SizedBox(
   //                     height: 8,
   //                   ),
-  //                   ElevatedButton.icon(
+  //                   OutlinedButton.icon(
   //                     onPressed: () {
-  //                       FlushbarGlobal.show(
+  //                       AppSnack.show(
   //                           'Updating events for ${sourceSelection.eventInfoSource.fullDescription}... (This may take a few seconds.)',
-  //                           style: FlushbarStyle.info);
+  //                           style: AppSnackStyle.info);
   //                       setState(() {
   //                         updatingEvents = true;
   //                       });
@@ -779,7 +772,7 @@ class _EventCardState extends State<EventCard> {
               cueVersion: cueVersion)
           .xyText;
       if (offeredCode == oldCode) {
-        FlushbarGlobal.show("Start Code from OLD cue version.");
+        AppSnack.show("Start Code from OLD cue version.");
         return null;
       }
       cueVersion--;
@@ -829,21 +822,6 @@ class _EventCardState extends State<EventCard> {
   //   controller.clear();
   // }
 
-  // Widget showEventName(Event event) {
-  //   return GestureDetector(
-  //     onTap: () {
-  //       openEventNameDialog(event);
-  //     },
-  //     child: Text(
-  //       event.nameDist,
-  //       style: TextStyle(
-  //           fontSize:
-  //               Theme.of(context).primaryTextTheme.bodyLarge?.fontSize ?? 16,
-  //           color: Theme.of(context).colorScheme.primary),
-  //     ),
-  //   );
-  // }
-
   Future openEventInfoDialog(Event event) {
     final we = event;
     final regionID = we.regionID;
@@ -882,7 +860,7 @@ class _EventCardState extends State<EventCard> {
                 // Right side: Icon button
                 IconButton(
                   icon: const Icon(Icons.language_rounded),
-                  color: Colors.blueAccent, // accent color
+                  color: Theme.of(context).colorScheme.primary,
                   tooltip: 'Event Website',
                   onPressed: we.eventInfoUrl.isEmpty
                       ? null
@@ -906,7 +884,7 @@ class _EventCardState extends State<EventCard> {
             const SizedBox(height: 8), // add spacing before button
 
             Center(
-              child: ElevatedButton.icon(
+              child: OutlinedButton.icon(
                 onPressed: () {
                   Navigator.push(
                     context,
@@ -921,7 +899,7 @@ class _EventCardState extends State<EventCard> {
               ),
             ),
             Center(
-              child: ElevatedButton.icon(
+              child: OutlinedButton.icon(
                 onPressed: () {
                   Navigator.push(
                     context,

@@ -1,7 +1,7 @@
 ---
 id: "0002"
 title: Apply Material 3 tokens and button hierarchy to the event list screen
-status: approved
+status: done
 requested_by: rbrancher
 issue: 2
 final_slice: false
@@ -31,28 +31,28 @@ As a rider, I want the event list to use the app theme, with an obvious primary 
 action, so that I can read it in sun or at night and see the next step at once.
 
 ## Acceptance criteria
-- [ ] AC1: `event_list_page.dart`, `event_card.dart` and `event_header_card.dart` contain
+- [x] AC1: `event_list_page.dart`, `event_card.dart` and `event_header_card.dart` contain
       no `Colors.` (except `Colors.transparent`), `Color(0x`, `fontSize:` or `Flushbar`.
       Their entries are removed from the `baseline` map in `test/style_guardrail_test.dart`,
       so the guardrail test enforces this. No other baseline count is raised.
-- [ ] AC2: Text that used literal sizes uses `textTheme` roles. The event title uses
+- [x] AC2: Text that used literal sizes uses `textTheme` roles. The event title uses
       `titleMedium` and the header card uses `titleLarge` and `bodyLarge`. A widget test
       checks the rendered title style matches the theme role.
-- [ ] AC3: The event website icon uses `colorScheme.primary` rather than `blueAccent`.
-- [ ] AC4: Each event card shows at most one `FilledButton`, the RIDE (or PRE-RIDE when
+- [x] AC3: The event website icon uses `colorScheme.primary` rather than `blueAccent`.
+- [x] AC4: Each event card shows at most one `FilledButton`, the RIDE (or PRE-RIDE when
       that is the start style) action. Other actions on the list screen and its dialogs use
       `FilledButton.tonal` or `OutlinedButton` (secondary) or `TextButton` (tertiary).
       Widget tests with the mock feed check that a card has exactly one `FilledButton` and
       that its label is the start action.
-- [ ] AC5: Add a global `scaffoldMessengerKey` to `MaterialApp` in `lib/main.dart`, and a
+- [x] AC5: Add a global `scaffoldMessengerKey` to `MaterialApp` in `lib/main.dart`, and a
       helper `AppSnack.show(message, {style})` in `lib/snackbarglobal.dart` that shows M3
       `SnackBar`s through it. The error style uses `error`/`onError`; other styles use theme
       roles or `AppTokens`. Migrate only the calls in `event_list_page.dart`,
       `event_card.dart` and `event_header_card.dart`. `FlushbarGlobal` stays for the other
       screens until their slices. A widget test shows a `SnackBar` with the message text.
-- [ ] AC6: Check-in, start-code, ride-start logic and the messages shown are unchanged.
+- [x] AC6: Check-in, start-code, ride-start logic and the messages shown are unchanged.
       Only the widget that displays them changes. Existing tests pass.
-- [ ] AC7: A widget test pumps the event list in mock mode in light and dark with
+- [x] AC7: A widget test pumps the event list in mock mode in light and dark with
       `textContrastGuideline` and `androidTapTargetGuideline`, and both pass for the cards
       and buttons on this screen.
 
