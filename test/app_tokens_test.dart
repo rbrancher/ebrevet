@@ -113,7 +113,8 @@ void main() {
   });
 
   // AC3 + AC4 (intent 0001)
-  testWidgets('tokens are reachable in the app in both modes and toggleMode '
+  testWidgets(
+      'tokens are reachable in the app in both modes and toggleMode '
       'switches day and night', (tester) async {
     final dn = DayNight();
     AppTokens? tokens;
@@ -152,8 +153,8 @@ void main() {
     dn.color = Colors.red;
     await tester.pumpAndSettle();
     expect(dn.color, Colors.red);
-    final expected =
-        ColorScheme.fromSeed(seedColor: Colors.red, brightness: Brightness.light);
+    final expected = ColorScheme.fromSeed(
+        seedColor: Colors.red, brightness: Brightness.light);
     expect(dn.dayTheme.colorScheme.primary, expected.primary);
     expect(tokens!.checkedIn.color, expected.primary);
     expect(tokens!.checkedIn.color, isNot(before));
@@ -200,7 +201,8 @@ void main() {
       final theme =
           brightness == Brightness.light ? dn.dayTheme : dn.nightTheme;
       final numeric = tokensOf(theme).numeric;
-      expect(numeric.fontFeatures, contains(const FontFeature.tabularFigures()));
+      expect(
+          numeric.fontFeatures, contains(const FontFeature.tabularFigures()));
       // Intent 0005: compare with the localized titleLarge (what
       // Theme.of(context) returns); the raw ThemeData style has no size.
       final localized =

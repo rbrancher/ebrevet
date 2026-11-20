@@ -325,8 +325,7 @@ class _EventCardState extends State<EventCard> {
               }
 
               if (!isPreride && !event.isStartable) {
-                AppSnack.show("Can't start now.",
-                    style: AppSnackStyle.error);
+                AppSnack.show("Can't start now.", style: AppSnackStyle.error);
                 return;
               }
 

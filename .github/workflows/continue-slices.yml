@@ -19,13 +19,14 @@ jobs:
       issues: write
     env:
       GH_TOKEN: ${{ github.token }}
+      HEAD_REF: ${{ github.event.pull_request.head.ref }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: main
       - name: Find the intent and dispatch triage for the next slice
         run: |
-          slug="${{ github.event.pull_request.head.ref }}"; slug="${slug#agent/}"
+          slug="${HEAD_REF#agent/}"
           file="intents/$slug.md"
           [ -f "$file" ] || { echo "::notice::no intent file $file on main"; exit 0; }
           issue=$(python3 harness/scripts/intents.py field "$file" issue)

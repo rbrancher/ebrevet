@@ -8,6 +8,7 @@ See `harness/README.md` for the pipeline.
 ```sh
 cp harness/ci/region_data.stub.dart lib/region_data.dart   # once; real file is gitignored
 flutter pub get
+dart format lib test                                       # CI fails on unformatted code
 flutter analyze
 flutter test
 flutter build web --dart-define=EBREVET_MOCK=true          # what PR previews run

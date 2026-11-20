@@ -185,24 +185,22 @@ void main() {
     expect(update, findsOneWidget);
     expect(
         find.ancestor(
-            of: find.text('Update event data'),
-            matching: isA_<FilledButton>()),
+            of: find.text('Update event data'), matching: isA_<FilledButton>()),
         findsNothing);
     expect(isA_<ElevatedButton>(skipOffstage: false), findsNothing);
     await unmount(tester);
   });
 
   // AC5 + AC6 (intent 0002)
-  testWidgets('AppSnack shows an M3 SnackBar with the message',
-      (tester) async {
+  testWidgets('AppSnack shows an M3 SnackBar with the message', (tester) async {
     await tester.pumpWidget(app(const Scaffold(body: SizedBox())));
     AppSnack.show('Hello rider');
     await tester.pump();
     expect(find.byType(SnackBar), findsOneWidget);
     expect(find.text('Hello rider'), findsOneWidget);
     // Info style takes its colors from the theme's snackBarTheme.
-    expect(tester.widget<SnackBar>(find.byType(SnackBar)).backgroundColor,
-        isNull);
+    expect(
+        tester.widget<SnackBar>(find.byType(SnackBar)).backgroundColor, isNull);
     await tester.pumpAndSettle();
     await tester.pump(const Duration(seconds: 4));
     await tester.pumpAndSettle();

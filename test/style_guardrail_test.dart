@@ -31,14 +31,13 @@ const Set<String> exemptFiles = {
 const Map<String, int> baseline = {};
 
 /// Number of banned-pattern matches in [source].
-int countViolations(String source) => bannedPatterns.values
-    .fold(0, (n, re) => n + re.allMatches(source).length);
+int countViolations(String source) =>
+    bannedPatterns.values.fold(0, (n, re) => n + re.allMatches(source).length);
 
 /// Checks [sources] (path -> contents) against [baseline]. Returns one
 /// message per file whose count exceeds its baseline (0 if not listed).
 List<String> checkSources(Map<String, String> sources,
-    {Map<String, int> baseline = baseline,
-    Set<String> exempt = exemptFiles}) {
+    {Map<String, int> baseline = baseline, Set<String> exempt = exemptFiles}) {
   final failures = <String>[];
   for (final path in sources.keys.toList()..sort()) {
     if (exempt.contains(path)) continue;
@@ -143,8 +142,7 @@ void main() {
     final sources = readLibSources();
     final dirty = [
       for (final e in sources.entries)
-        if (!exemptFiles.contains(e.key) && countViolations(e.value) > 0)
-          e.key
+        if (!exemptFiles.contains(e.key) && countViolations(e.value) > 0) e.key
     ];
     expect(dirty, isEmpty, reason: dirty.join('\n'));
     const cleaned = [
@@ -182,8 +180,7 @@ void main() {
 
     test('colorScheme roles only: passes', () {
       expect(countViolations(clean), 0);
-      expect(checkSources({'lib/new_page.dart': clean}, baseline: {}),
-          isEmpty);
+      expect(checkSources({'lib/new_page.dart': clean}, baseline: {}), isEmpty);
     });
 
     test('hard-coded Colors.* is reported', () {
@@ -196,14 +193,14 @@ void main() {
     });
 
     test('Color(0x...) is reported', () {
-      final r = checkSources(
-          {'lib/a.dart': 'const c = Color(0xFF123456);'}, baseline: {});
+      final r = checkSources({'lib/a.dart': 'const c = Color(0xFF123456);'},
+          baseline: {});
       expect(r.single, contains('Color(0x'));
     });
 
     test('fontSize: is reported', () {
-      final r = checkSources(
-          {'lib/a.dart': 'TextStyle(fontSize: 20)'}, baseline: {});
+      final r =
+          checkSources({'lib/a.dart': 'TextStyle(fontSize: 20)'}, baseline: {});
       expect(r.single, contains('fontSize:'));
     });
 
