@@ -33,9 +33,17 @@ glance.
 - [ ] AC1: New pure-Dart `lib/route_geometry.dart` takes an event's controls and returns
       the usable points in control order (skipping controls with non-finite coordinates,
       out-of-range lat/long, or exactly 0,0), plus the padded bounding box covering them.
-      Unit tests check order is preserved, padding is applied and every point lies inside
-      the padded box, a start-equals-finish loop keeps both points, and invalid points are
-      dropped.
+      Points are projected with spherical Web Mercator (EPSG:3857, the projection
+      `flutter_map` and OSM tiles use), so slice (b) can lay the same route over map tiles
+      without re-deriving the projection. Fitting into a target size uses one uniform scale
+      for x and y, centred, so the route's shape is never stretched to the card's aspect
+      ratio. Unit tests check:
+      - order is preserved
+      - padding is applied and every point lies inside the padded box
+      - a start-equals-finish loop keeps both points
+      - invalid points are dropped
+      - a north-south route and an east-west route of equal ground length keep equal
+        length when fitted into a 16:9 box (uniform scale)
 - [ ] AC2: The geometry reports "not drawable" when fewer than 2 usable points remain or
       all points are identical (zero extent). Unit tests cover a single control, all-invalid
       controls, and identical points.
