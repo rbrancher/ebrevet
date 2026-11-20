@@ -1,7 +1,7 @@
 ---
 id: "0006"
 title: Read-only rider profile page with ride stats, opened from the app bar
-status: approved
+status: done
 requested_by: rbrancher
 issue: 17
 final_slice: false
@@ -34,47 +34,47 @@ ridden.
 This is slice (a). The stats model is a pure function over `ActivatedEvent`s. No check-in
 rule, code or persisted state is edited.
 
-- [ ] AC1: A pure `ProfileStats` calculation (new `lib/profile_stats.dart`) takes a list of
+- [x] AC1: A pure `ProfileStats` calculation (new `lib/profile_stats.dart`) takes a list of
       `ActivatedEvent` and a rider ID, and returns total finished rides, total km (sum of
       `event.distance`), longest ride km, and a count per distance bucket. A unit test covers
       each rule below.
-- [ ] AC2: Only rides with `isFinished` (outcome `finish`) count. `active`, `dnf`, `dns`,
+- [x] AC2: Only rides with `isFinished` (outcome `finish`) count. `active`, `dnf`, `dns`,
       all `dnq*` and `unknown` outcomes do not.
-- [ ] AC3: Only rides whose `riderID` equals the current Rider ID count (compared after
+- [x] AC3: Only rides whose `riderID` equals the current Rider ID count (compared after
       trimming). Rides under another ID are ignored.
-- [ ] AC4: Finished pre-rides (`StartStyle.preRide`) count as rides, like any other start style.
-- [ ] AC5: Distance buckets are Populaire (under 200), 200, 300, 400, 600, 1000 and 1200+.
+- [x] AC4: Finished pre-rides (`StartStyle.preRide`) count as rides, like any other start style.
+- [x] AC5: Distance buckets are Populaire (under 200), 200, 300, 400, 600, 1000 and 1200+.
       Bucketing is by official `event.distance`, with each standard distance covering the range
       from itself up to (not including) the next one. Unit tests cover 199 -> Populaire,
       200 -> 200, 299 -> 200, 300 -> 300, 999 -> 600, 1000 -> 1000, 1199 -> 1000,
       1200 -> 1200+ and 1400 -> 1200+.
-- [ ] AC6: Empty history, or no finished rides for the current ID, yields an "isEmpty"
+- [x] AC6: Empty history, or no finished rides for the current ID, yields an "isEmpty"
       result and the page shows a friendly empty state instead of zeros.
-- [ ] AC7: The Profile page (`lib/profile_page.dart`) is read-only, with no edit icon or
+- [x] AC7: The Profile page (`lib/profile_page.dart`) is read-only, with no edit icon or
       dialog. It has a medium or large top app bar, a header with an initials avatar, the full
       name as the most prominent text and the Rider ID, a stats card group (rides, total km,
       longest ride) using `AppTokens.numeric`, and a "Distances completed" section listing all
       seven buckets. Completed buckets show their count. Buckets with none read "Not yet".
       A widget test pumps the page with fixture rides and finds these values, in light and dark,
       with `textContrastGuideline` and `androidTapTargetGuideline` passing.
-- [ ] AC8: The page states plainly that stats come from rides saved on this phone and that
+- [x] AC8: The page states plainly that stats come from rides saved on this phone and that
       history is pruned after the "keep past events" months setting, so they are not lifetime
       totals. A widget test finds this text.
-- [ ] AC9: The page has a link that opens the existing My Rides page.
-- [ ] AC10: The top-level event list app bar gets a profile action as its last (rightmost)
+- [x] AC9: The page has a link that opens the existing My Rides page.
+- [x] AC10: The top-level event list app bar gets a profile action as its last (rightmost)
       action, after the day/night toggle. It shows an initials avatar, or a generic account icon
       if no name is set, has a "Profile" tooltip and semantic label, and a 48 dp touch target.
       Tapping it opens the Profile page. A widget test covers both avatar variants, the order
       relative to the day/night toggle, and navigation.
-- [ ] AC11: The rider line in the drawer header opens the Profile page. A widget test taps it.
-- [ ] AC12: In mock mode, a few finished mock rides for the demo rider ID covering 2-3
+- [x] AC11: The rider line in the drawer header opens the Profile page. A widget test taps it.
+- [x] AC12: In mock mode, a few finished mock rides for the demo rider ID covering 2-3
       distances, plus one DNF, are available so the preview shows non-zero totals and a
       partly filled distance list. They are added only in mock mode through the existing mock
       seams. Native and production builds are unaffected, and tests use fixtures from
       `test/support`.
-- [ ] AC13: Styling uses theme color roles, `AppTokens` and `textTheme` only. The baseline
+- [x] AC13: Styling uses theme color roles, `AppTokens` and `textTheme` only. The baseline
       in `test/style_guardrail_test.dart` stays empty and the guardrail passes.
-- [ ] AC14: No behaviour change elsewhere. `flutter analyze` and `flutter test` stay green.
+- [x] AC14: No behaviour change elsewhere. `flutter analyze` and `flutter test` stay green.
 
 ## Out of scope
 Slice (b), the final slice, in order:

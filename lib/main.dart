@@ -92,7 +92,7 @@ Future<void> initSettings() async {
     // Previews land straight on the event list with a demo rider.
     await AppSettings.firstName.setValue('Mock');
     await AppSettings.lastName.setValue('Rider');
-    await AppSettings.rusaID.setValue('12345');
+    await AppSettings.rusaID.setValue(MockServer.demoRiderID);
   }
   // await AppSettings.initializeMySettings();
   await Region.fetchRegionsFromDisk(
@@ -110,6 +110,10 @@ Future<void> initSettings() async {
   //     quiet: true); // will update disk if successful
 
   await ScheduledEvents.refreshEventsFromDisk();
+  if (kMockMode) {
+    // Previews get a few past rides so the Profile page has stats.
+    await MockServer.seedDemoRides();
+  }
   await MyActivatedEvents.load();
 
   MyLogger.entry('...Init settings end');

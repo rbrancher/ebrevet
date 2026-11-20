@@ -32,6 +32,7 @@ import 'app_settings.dart';
 import 'app_tokens.dart';
 import 'settings_page.dart';
 import 'log_page.dart';
+import 'profile_page.dart';
 import 'event_list_page.dart';
 
 class SideMenuDrawer extends StatelessWidget {
@@ -64,9 +65,27 @@ class SideMenuDrawer extends StatelessWidget {
                 SizedBox(
                   height: tokens.spaceSmall,
                 ),
-                Text(
-                    'Rider: ${AppSettings.firstName.value} ${AppSettings.lastName.value} (${AppSettings.rusaID.value})',
-                    style: subtitleStyle),
+                // Opens the Profile page (intent 0006).
+                InkWell(
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.of(context)
+                        .push(MaterialPageRoute(
+                          builder: (context) => const ProfilePage(),
+                        ))
+                        .then((value) => onClose?.call());
+                  },
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 48),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      widthFactor: 1,
+                      child: Text(
+                          'Rider: ${AppSettings.firstName.value} ${AppSettings.lastName.value} (${AppSettings.rusaID.value})',
+                          style: subtitleStyle),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
