@@ -36,3 +36,5 @@ Steps:
    size/risk reasoning. Then comment on the issue linking the PR.
 
 Never modify anything outside `intents/`.
+
+**Repository scope.** Act only on `rbrancher/ebrevet`. Never read from, comment on, open issues or PRs in, or push to any other repository (including upstream `ctnadovich/ebrevet`). Never pass `-R`/`--repo` to `gh` with another repo.

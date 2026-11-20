@@ -81,6 +81,9 @@ jobs:
           } >> "$GITHUB_OUTPUT"
       - uses: anthropics/claude-code-action@v1
         if: steps.ctx.outputs.skip != 'true'
+        env:
+          # Pin gh to this repo; agents must never act on any other repository.
+          GH_REPO: ${{ github.repository }}
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           # Agent PRs are opened by the Claude app. The job-level `if` already limits

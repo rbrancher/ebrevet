@@ -44,17 +44,31 @@ jobs:
       deployments: write
     env:
       HAS_CF: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
+      GH_TOKEN: ${{ github.token }}
     steps:
+      # No preview for PRs that cannot change the app, e.g. intent-only (gate 1) PRs.
+      # Every changed file under intents/ or docs/, or a Markdown file, means nothing to preview.
+      - name: Does this PR change the app?
+        id: scope
+        run: |
+          files=$(gh pr diff ${{ github.event.number }} -R "${{ github.repository }}" --name-only)
+          echo "$files"
+          if echo "$files" | grep -qvE '^(intents/|docs/)|\.md$'; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Only intents/docs/Markdown changed; skipping preview deploy."
+          fi
       - name: Skip notice
         if: env.HAS_CF != 'true'
         run: echo "::notice::CLOUDFLARE_API_TOKEN not set; skipping preview deploy."
       - uses: actions/download-artifact@v4
-        if: env.HAS_CF == 'true'
+        if: env.HAS_CF == 'true' && steps.scope.outputs.code == 'true'
         with:
           name: web
           path: web
       - name: Deploy to Cloudflare Pages
-        if: env.HAS_CF == 'true'
+        if: env.HAS_CF == 'true' && steps.scope.outputs.code == 'true'
         id: deploy
         uses: cloudflare/wrangler-action@v3
         with:
@@ -62,7 +76,7 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy web --project-name=${{ vars.CF_PAGES_PROJECT || 'ebrevet' }} --branch=pr-${{ github.event.number }}
       - name: Comment preview URL
-        if: env.HAS_CF == 'true'
+        if: env.HAS_CF == 'true' && steps.scope.outputs.code == 'true'
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           header: preview
