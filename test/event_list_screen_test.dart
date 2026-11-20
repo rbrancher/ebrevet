@@ -4,6 +4,8 @@
 // feed. ScheduledEventsPage itself is not pumped because its location
 // permission check needs geolocator outside mock mode.
 
+import 'dart:io';
+
 import 'package:ebrevet_card/app_settings.dart';
 import 'package:ebrevet_card/control_state.dart';
 import 'package:ebrevet_card/day_night.dart';
@@ -92,12 +94,14 @@ void main() {
     MockServer.now = DateTime.now;
   });
 
-  // AC2 (intent 0002)
-  testWidgets('event title uses titleMedium', (tester) async {
+  // AC2 (intent 0002), superseded by AC6 (intent 0009): the event title is
+  // now a titleLarge headline with a bolder weight.
+  testWidgets('event title uses titleLarge, bold', (tester) async {
     await tester.pumpWidget(app(eventList()));
     await tester.pump();
     final theme = Theme.of(tester.element(find.byType(LatestEventList)));
-    final role = theme.textTheme.titleMedium!;
+    final role =
+        theme.textTheme.titleLarge!.copyWith(fontWeight: FontWeight.w700);
     final title =
         tester.widget<EventCard>(find.byType(EventCard).first).event.nameDist;
     final style = tester
@@ -215,6 +219,9 @@ void main() {
     await tester.pump();
     final ride = find.byWidgetPredicate(
         (w) => w is FilledButton && startActions.contains(labelOf(w)));
+    // Cards are taller since the route sketch (intent 0009).
+    await tester.ensureVisible(ride.first);
+    await tester.pump();
     await tester.tap(ride.first);
     await tester.pump();
     expect(find.text("Can't RIDE. Rider ID not set."), findsOneWidget);
@@ -234,7 +241,16 @@ void main() {
     await unmount(tester);
   });
 
-  // AC7 (intent 0002)
+  // AC10 (intent 0009): slice (a) draws the sketch locally and adds no
+  // dependency; the map package arrives in slice (b).
+  test('no map dependency in pubspec.yaml', () {
+    final pubspec = File('pubspec.yaml').readAsStringSync();
+    expect(pubspec, isNot(contains('flutter_map')));
+    expect(pubspec, isNot(contains('latlong2')));
+  });
+
+  // AC7 (intent 0002), AC10 (intent 0009): cards now include the route
+  // sketch.
   for (final mode in [ThemeMode.light, ThemeMode.dark]) {
     testWidgets('event list meets contrast and tap-target guidelines ($mode)',
         (tester) async {

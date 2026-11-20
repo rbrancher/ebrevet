@@ -30,7 +30,7 @@ underneath, and a small drawing of the route's shape, so that I can tell rides a
 glance.
 
 ## Acceptance criteria
-- [ ] AC1: New pure-Dart `lib/route_geometry.dart` takes an event's controls and returns
+- [x] AC1: New pure-Dart `lib/route_geometry.dart` takes an event's controls and returns
       the usable points in control order (skipping controls with non-finite coordinates,
       out-of-range lat/long, or exactly 0,0), plus the padded bounding box covering them.
       Points are projected with spherical Web Mercator (EPSG:3857, the projection
@@ -44,39 +44,39 @@ glance.
       - invalid points are dropped
       - a north-south route and an east-west route of equal ground length keep equal
         length when fitted into a 16:9 box (uniform scale)
-- [ ] AC2: The geometry reports "not drawable" when fewer than 2 usable points remain or
+- [x] AC2: The geometry reports "not drawable" when fewer than 2 usable points remain or
       all points are identical (zero extent). Unit tests cover a single control, all-invalid
       controls, and identical points.
-- [ ] AC3: New `RouteSketch` widget draws the route with a `CustomPaint` on a neutral
+- [x] AC3: New `RouteSketch` widget draws the route with a `CustomPaint` on a neutral
       themed background (`ColorScheme` / `AppTokens` only, no literal colors). It draws the
       polyline in control order with a contrasting casing, a distinct start marker, a
       distinct finish marker and dots for intermediate controls. For a loop (start equals
       finish) it draws a combined start/finish marker rather than hiding one marker. It has
       a fixed aspect ratio and no gestures. A widget test checks the fixed size and that no
       gesture detector or scrollable is added.
-- [ ] AC4: `RouteSketch` has semantics label "Sketch of the route with N controls" (N is
+- [x] AC4: `RouteSketch` has semantics label "Sketch of the route with N controls" (N is
       the control count of the event, not the usable count). When the geometry is not
       drawable it shows a neutral placeholder of the same size with an icon, and no painter.
       Widget tests cover both.
-- [ ] AC5: `EventCard` places the `RouteSketch` at the top of the card for upcoming events
+- [x] AC5: `EventCard` places the `RouteSketch` at the top of the card for upcoming events
       in the event list, above the text. The sketch is drawn locally: no tiles, no network
       access. A widget test with the mock feed checks each card has one.
-- [ ] AC6: The card's headline (event name and distance) uses `titleLarge` with a bolder
+- [x] AC6: The card's headline (event name and distance) uses `titleLarge` with a bolder
       weight than today, and the club name is a subhead using `onSurfaceVariant`. A widget
       test checks the headline font size and weight are greater than the subhead's.
-- [ ] AC7: The card keeps every item it shows today: club, start city and state, start
+- [x] AC7: The card keeps every item it shows today: club, start city and state, start
       style, gravel line when present, date and status text, UNDERWAY! state, cue version,
       the info and check-ins buttons, the outcome row from intent 0002 and the single
       filled RIDE / PRE-RIDE button. Only layout and emphasis change. Existing event-list
       tests still pass and a test asserts each item is present on a mock-feed card.
-- [ ] AC8: Distance and the gravel percentage may become compact chips. If so, the full
+- [x] AC8: Distance and the gravel percentage may become compact chips. If so, the full
       gravel text remains available to screen readers.
-- [ ] AC9: The card in My Rides (past rides) still renders correctly with the shared
+- [x] AC9: The card in My Rides (past rides) still renders correctly with the shared
       widget. It may omit the sketch there if the layout is cramped. A widget test pumps it.
-- [ ] AC10: The event list in mock mode passes `textContrastGuideline` and
+- [x] AC10: The event list in mock mode passes `textContrastGuideline` and
       `androidTapTargetGuideline` in light and dark. The style guardrail baseline stays
       empty. No new dependency is added to `pubspec.yaml`.
-- [ ] AC11: Check-in rules, codes, saved ride state and server reporting are unchanged.
+- [x] AC11: Check-in rules, codes, saved ride state and server reporting are unchanged.
 
 ## Out of scope
 - Slice (b): replace the neutral background with a real static `flutter_map` base map. It
