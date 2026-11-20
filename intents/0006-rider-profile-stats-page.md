@@ -1,7 +1,6 @@
 ---
 id: "0006"
 title: Read-only rider profile page with ride stats, opened from the app bar
-status: done
 requested_by: rbrancher
 issue: 17
 final_slice: false

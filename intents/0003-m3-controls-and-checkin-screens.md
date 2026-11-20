@@ -1,7 +1,6 @@
 ---
 id: "0003"
 title: Apply Material 3 tokens, status colors and button hierarchy to the controls and check-in screens
-status: done
 requested_by: rbrancher
 issue: 2
 final_slice: false

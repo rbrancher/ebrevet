@@ -1,7 +1,6 @@
 ---
 id: "0005"
 title: Apply Material 3 tokens to settings, certificate, log, past events and side menu
-status: done
 requested_by: rbrancher
 issue: 2
 final_slice: true

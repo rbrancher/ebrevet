@@ -1,7 +1,6 @@
 ---
 id: "0002"
 title: Apply Material 3 tokens and button hierarchy to the event list screen
-status: done
 requested_by: rbrancher
 issue: 2
 final_slice: false

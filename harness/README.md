@@ -2,18 +2,18 @@
 
 ```
 issue (feature form) ──maintainer adds `request` label──▶ triage.yml
-   triage agent writes intents/NNNN-slug.md (status: draft) and opens an intent PR
+   triage agent writes intents/NNNN-slug.md and opens an intent PR
         │
-   GATE 1: human edits the spec, sets `status: approved`, merges
+   GATE 1: human edits the spec and merges (approve), or closes the PR (reject)
         │
-   build-loop.yml (push to main touching intents/**)
+   build-loop.yml (push to main that adds a new intent file)
    implement agent on agent/NNNN-slug: code + tests, then analyze/test/build web, then open a PR
         │
    ci.yml (analyze, test, mock-mode web build) ──▶ Cloudflare Pages preview pr-<n>, URL posted as a sticky comment
    pr-review.yml (advisory AI review against the acceptance criteria)
    fix-loop.yml  (CI red or maintainer "@claude ..." ──▶ agent fixes, max 3 attempts, then `needs-human`)
         │
-   GATE 2: human merges, and the intent ends up `status: done` on main
+   GATE 2: human merges the agent PR, and the intent counts as built
         │
    continue-slices.yml: if the intent has `final_slice: false`, re-run triage on the issue
    ──▶ the next slice's intent PR (back to GATE 1). The last slice's PR closes the issue.
@@ -45,7 +45,21 @@ You can also re-trigger triage by hand with a `/triage` comment on the issue, or
    - require a review from Code Owners
    - disallow force-push
 
-## Intent status
-`draft` (triage) → `approved` (gate 1, merged to main) → `done` (set in the agent PR, true once merged).
-`blocked` means the agent could not finish. `rejected` means a human declined it.
-In-flight work is visible as open `agent/*` PRs. Run `python3 harness/scripts/intents.py index` for a table.
+## Intent state
+Intents have no status field. Their state comes from git and GitHub, so it cannot drift:
+
+| State | Signal |
+|---|---|
+| proposed | open `intent/*` PR (gate 1 pending) |
+| rejected | intent PR closed without merging; `intent-rejected.yml` comments on the issue |
+| approved | the intent file is on `main`; adding it there starts the build loop |
+| building / in review | running `build-loop` job, or an open `agent/*` PR |
+| stuck | `needs-human` label on the agent PR |
+| built | the `agent/<slug>` PR is merged |
+
+- Editing an intent already on `main` never starts a build. To rebuild one, run
+  `gh workflow run build-loop.yml -f intent=intents/NNNN-slug.md` (refused if already built).
+- "Built" is read from git history: a merge commit from `agent/<slug>`, or a squash commit
+  titled `<id>: … (#N)`. Do not rebase-merge agent PRs; that leaves no marker.
+- To park an approved idea without building it, leave its intent PR open (or in draft).
+- `python3 harness/scripts/intents.py index` prints a table; `for-issue N` lists an issue's slices.
