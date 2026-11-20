@@ -10,3 +10,5 @@ You are on an existing `agent/*` PR branch. Either CI failed or a maintainer ask
 
 Same hard rules as implementation: never touch `.github/`, `harness/`, signing files, `lib/region_data.dart`,
 real secrets or production URLs.
+
+**Repository scope.** Act only on `rbrancher/ebrevet`. Never read from, comment on, open issues or PRs in, or push to any other repository (including upstream `ctnadovich/ebrevet`). Never pass `-R`/`--repo` to `gh` with another repo.

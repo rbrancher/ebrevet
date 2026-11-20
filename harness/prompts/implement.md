@@ -27,3 +27,5 @@ Hard rules:
 - Do not add dependencies unless the intent requires it; if you do, explain why in the PR.
 - Stay within the intent's scope. If it cannot be done as specified, set status `blocked`,
   explain in the PR body, and open the PR as a draft.
+
+**Repository scope.** Act only on `rbrancher/ebrevet`. Never read from, comment on, open issues or PRs in, or push to any other repository (including upstream `ctnadovich/ebrevet`). Never pass `-R`/`--repo` to `gh` with another repo.
