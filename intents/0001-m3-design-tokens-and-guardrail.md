@@ -1,7 +1,6 @@
 ---
 id: "0001"
 title: Add Material 3 design tokens, themed components and a style guardrail
-status: done
 requested_by: rbrancher
 issue: 2
 final_slice: false

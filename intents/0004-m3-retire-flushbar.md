@@ -1,7 +1,6 @@
 ---
 id: "0004"
 title: Retire Flushbar - move every toast to AppSnack (M3 SnackBar)
-status: done
 requested_by: rbrancher
 issue: 2
 final_slice: false

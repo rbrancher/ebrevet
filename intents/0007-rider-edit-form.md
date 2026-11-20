@@ -1,7 +1,6 @@
 ---
 id: "0007"
 title: Full-screen rider edit form, reused for first run, and rider fields removed from Settings
-status: draft
 requested_by: rbrancher
 issue: 17
 final_slice: true

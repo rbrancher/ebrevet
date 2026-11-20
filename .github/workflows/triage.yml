@@ -33,6 +33,8 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # intents.py for-issue reads merge history to tell built slices
       - id: prompt
         env:
           ISSUE: ${{ github.event.issue.number || inputs.issue }}

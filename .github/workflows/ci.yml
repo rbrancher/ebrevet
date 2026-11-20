@@ -84,7 +84,7 @@ jobs:
             **Web preview (mock mode):** ${{ steps.deploy.outputs.pages-deployment-alias-url || steps.deploy.outputs.deployment-url }}
             Built from ${{ github.event.pull_request.head.sha }}. Mock data only: no real servers are contacted.
 
-  # Post-merge: main now reflects the merged intent's status; publish the production preview too.
+  # Post-merge: publish main as the production preview.
   deploy-main:
     needs: ci
     if: github.event_name == 'push'

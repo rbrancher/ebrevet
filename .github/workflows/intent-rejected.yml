@@ -1,0 +1,26 @@
+name: intent-rejected
+# Closing an intent PR without merging it is the rejection at gate 1.
+# Tell the linked issue so the requester sees the outcome.
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  notify:
+    if: >-
+      github.event.pull_request.merged == false &&
+      startsWith(github.event.pull_request.head.ref, 'intent/') &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      BODY: ${{ github.event.pull_request.body }}
+    steps:
+      - name: Comment on the linked issue
+        run: |
+          issue=$(printf '%s' "$BODY" | grep -oE 'Refs #[0-9]+' | head -1 | tr -dc '0-9')
+          if [ -z "$issue" ]; then echo "No 'Refs #N' in the PR body; nothing to notify."; exit 0; fi
+          gh issue comment "$issue" -R "${{ github.repository }}" --body \
+            "Intent PR #${{ github.event.pull_request.number }} was closed without merging, so this slice will not be built. A maintainer can comment \`/triage\` to draft a new intent."

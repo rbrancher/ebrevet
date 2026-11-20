@@ -1,14 +1,24 @@
 #!/usr/bin/env python3
 """Intent file tooling for the eBrevet AI-SDLC harness.
 
+Intents have no status field. Their state comes from git and GitHub:
+  open intent/* PR         proposed (gate 1 pending); closed unmerged = rejected
+  intent file on main      approved; merging the intent PR is the approval
+  agent/<slug> merged      built (done)
+
 Usage:
-  intents.py validate [FILES...]        validate frontmatter + required sections (default: all intents)
-  intents.py approved-changed BASE HEAD print intent paths whose status became 'approved' between two commits
-  intents.py set-status FILE STATUS     rewrite the status field in place
-  intents.py next-id                    print the next free 4-digit id
-  intents.py for-issue N                print intents linked to issue N: path, status, final_slice
-  intents.py field FILE KEY             print one frontmatter field
-  intents.py index                      print a markdown table of all intents
+  intents.py validate [FILES...]   validate frontmatter + required sections (default: all intents)
+  intents.py added BASE HEAD       print intent paths added between two commits (new approvals)
+  intents.py built FILE [REV]      exit 0 if the intent's agent PR is merged into REV (default HEAD)
+  intents.py next-id               print the next free 4-digit id
+  intents.py for-issue N           print intents linked to issue N: path, built|pending, final_slice
+  intents.py field FILE KEY        print one frontmatter field
+  intents.py index                 print a markdown table of all intents
+
+"Built" is read from git history, so callers in CI need a full clone (fetch-depth: 0).
+It recognises a merge commit ("Merge pull request #N from <owner>/agent/<slug>") or a
+squash commit (subject "<id>: <title> (#N)", the agent PR title). Rebase merges leave
+no marker, so do not rebase-merge agent PRs.
 
 No third-party dependencies: the frontmatter subset used by intents is parsed by hand.
 """
@@ -20,15 +30,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 INTENTS = ROOT / "intents"
 
-STATUSES = {"draft", "approved", "in-progress", "in-review", "done", "rejected", "blocked"}
 ENUMS = {
-    "status": STATUSES,
     "priority": {"low", "medium", "high"},
     "size": {"S", "M", "L"},
     "risk": {"low", "medium", "high"},
     "final_slice": {"true", "false"},
 }
-REQUIRED_FIELDS = ["id", "title", "status", "requested_by", "issue", "final_slice",
+REQUIRED_FIELDS = ["id", "title", "requested_by", "issue", "final_slice",
                    "priority", "size", "risk", "touches"]
 REQUIRED_SECTIONS = ["Problem", "User story", "Acceptance criteria", "Out of scope", "Test plan"]
 NAME_RE = re.compile(r"^(\d{4})-[a-z0-9]+(-[a-z0-9]+)*\.md$")
@@ -79,6 +87,9 @@ def validate(path):
     for f in REQUIRED_FIELDS:
         if f not in data:
             errs.append(f"{path}: missing field '{f}'")
+    if "status" in data:
+        errs.append(f"{path}: remove the 'status' field; merging the intent PR approves it "
+                    "and the merged agent PR marks it built")
     for f, allowed in ENUMS.items():
         if f in data and data[f] not in allowed:
             errs.append(f"{path}: {f}={data[f]!r} not in {sorted(allowed)}")
@@ -99,33 +110,23 @@ def all_intents():
     return sorted(p for p in INTENTS.glob("*.md") if NAME_RE.match(p.name))
 
 
-def status_at(rev, relpath):
-    try:
-        text = subprocess.run(["git", "show", f"{rev}:{relpath}"], cwd=ROOT,
-                              capture_output=True, text=True, check=True).stdout
-        return parse_frontmatter(split_frontmatter(text)[0]).get("status")
-    except (subprocess.CalledProcessError, ValueError):
-        return None
+def git(*args):
+    return subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True,
+                          check=True).stdout
 
 
-def approved_changed(base, head):
-    out = subprocess.run(["git", "diff", "--name-only", base, head, "--", "intents/"],
-                         cwd=ROOT, capture_output=True, text=True, check=True).stdout
-    for rel in out.split():
-        if NAME_RE.match(Path(rel).name) and status_at(head, rel) == "approved" \
-                and status_at(base, rel) != "approved":
+def added(base, head):
+    for rel in git("diff", "--name-only", "--diff-filter=A", base, head, "--", "intents/").split():
+        if NAME_RE.match(Path(rel).name):
             print(rel)
 
 
-def set_status(path, status):
-    if status not in STATUSES:
-        sys.exit(f"bad status {status!r}")
-    p = Path(path)
-    text = p.read_text()
-    new, n = re.subn(r"^status:\s*\S+", f"status: {status}", text, count=1, flags=re.M)
-    if n != 1:
-        sys.exit(f"{path}: no status field")
-    p.write_text(new)
+def is_built(path, rev="HEAD"):
+    name = Path(path).name
+    slug, iid = name[:-3], NAME_RE.match(name).group(1)
+    pattern = (rf"^Merge pull request #[0-9]+ from [^ /]+/agent/{re.escape(slug)}$"
+               rf"|^{iid}: .* \(#[0-9]+\)$")
+    return bool(git("log", rev, "-E", "--format=%H", f"--grep={pattern}").strip())
 
 
 def main(argv):
@@ -137,10 +138,10 @@ def main(argv):
         errs = [e for f in files for e in validate(f)]
         print("\n".join(errs) if errs else f"ok: {len(files)} intent(s)")
         sys.exit(1 if errs else 0)
-    elif cmd == "approved-changed":
-        approved_changed(*args)
-    elif cmd == "set-status":
-        set_status(*args)
+    elif cmd == "added":
+        added(*args)
+    elif cmd == "built":
+        sys.exit(0 if is_built(*args) else 1)
     elif cmd == "next-id":
         ids = [int(NAME_RE.match(p.name).group(1)) for p in all_intents()]
         print(f"{(max(ids) if ids else 0) + 1:04d}")
@@ -148,14 +149,16 @@ def main(argv):
         for p in all_intents():
             d, _ = load(p)
             if str(d.get("issue")) == args[0]:
-                print(f"intents/{p.name}\t{d.get('status')}\t{d.get('final_slice')}")
+                state = "built" if is_built(p) else "pending"
+                print(f"intents/{p.name}\t{state}\t{d.get('final_slice')}")
     elif cmd == "field":
         print(load(args[0])[0].get(args[1], ""))
     elif cmd == "index":
-        print("| id | title | status | size | risk | issue | final |\n|---|---|---|---|---|---|---|")
+        print("| id | title | built | size | risk | issue | final |\n|---|---|---|---|---|---|---|")
         for p in all_intents():
             d, _ = load(p)
-            print(f"| [{d.get('id')}]({p.name}) | {d.get('title')} | {d.get('status')} "
+            built = "yes" if is_built(p) else "no"
+            print(f"| [{d.get('id')}]({p.name}) | {d.get('title')} | {built} "
                   f"| {d.get('size')} | {d.get('risk')} | {d.get('issue')} | {d.get('final_slice')} |")
     else:
         sys.exit(__doc__)
