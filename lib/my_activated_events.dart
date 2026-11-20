@@ -145,7 +145,7 @@ class MyActivatedEvents {
     }
   }
 
-  static deleteMyActivatedEvent(ActivatedEvent pe) {
+  static void deleteMyActivatedEvent(ActivatedEvent pe) {
     if (_myActivatedEventsMap.containsKey(pe.event.eventID)) {
       _myActivatedEventsMap.remove(pe.event.eventID);
       MyActivatedEvents.save().then((status) {

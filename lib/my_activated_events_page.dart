@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with eBrevet.  If not, see <http://www.gnu.org/licenses/>.
 
+import 'dart:async';
+
 import 'package:ebrevet_card/app_settings.dart';
 import 'package:ebrevet_card/my_activated_events.dart';
 import 'package:flutter/material.dart';
@@ -82,9 +84,10 @@ class _MyActivatedEventsPageState extends State<MyActivatedEventsPage> {
       ),
       onPressed: () async {
         if (context.mounted) {
-          Navigator.of(context).push(MaterialPageRoute(
+          // Deliberately not awaited: nothing to do when the page is popped.
+          unawaited(Navigator.of(context).push(MaterialPageRoute(
             builder: (context) => CertificatePage(pe!),
-          ));
+          )));
         } else {
           MyLogger.entry("Not mounted!?");
         }

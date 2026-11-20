@@ -45,7 +45,7 @@ class FileStorage {
 
   void clear() async {
     if (kIsWeb) {
-      (await SharedPreferences.getInstance()).remove(_webKey);
+      await (await SharedPreferences.getInstance()).remove(_webKey);
       return;
     }
     try {

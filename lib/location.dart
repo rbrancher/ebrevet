@@ -109,34 +109,34 @@ class RiderLocation {
     }
   }
 
-  static get latLongString {
+  static String get latLongString {
     return '${(riderLocation != null) ? riderLocation!.latitude.toStringAsFixed(5) : '?'}N, '
         '${(riderLocation != null) ? riderLocation!.longitude.toStringAsFixed(5) : '?'}E';
   }
 
-  static get latLongFullString {
+  static String get latLongFullString {
     return '${(riderLocation != null) ? riderLocation!.latitude.toString() : '?'}N, '
         '${(riderLocation != null) ? riderLocation!.longitude.toString() : '?'}E';
   }
 
-  static get lastLocationUpdateString {
+  static String get lastLocationUpdateString {
     return (lastLocationUpdate == null)
         ? 'Never'
         : (lastLocationUpdate.toString()).substring(11, 16);
   }
 
-  static get lastLocationUpdateMinutesAgoString {
+  static String get lastLocationUpdateMinutesAgoString {
     if (lastLocationUpdate == null) return 'unknown';
     return DateTime.now().difference(lastLocationUpdate!).inMinutes.toString();
   }
 
-  static get lastLocationUpdateUTCString {
+  static String get lastLocationUpdateUTCString {
     return (lastLocationUpdate == null)
         ? 'Never'
         : (lastLocationUpdate!.toUtc().toIso8601String());
   }
 
-  static get lastLocationUpdateTimeZoneName {
+  static String get lastLocationUpdateTimeZoneName {
     return (lastLocationUpdate == null) ? '' : lastLocationUpdate!.timeZoneName;
   }
 }
@@ -191,7 +191,7 @@ class ControlLocation {
     'North'
   ];
 
-  String angleToCompassHeading(theta) {
+  String angleToCompassHeading(double theta) {
     return octant[((8 * theta / 360.0) % 8).round()];
   }
 
@@ -215,7 +215,7 @@ class ControlLocation {
       (crowDistMiles == null) ? '?' : crowDistMeters!.toStringAsFixed(1);
 
   String get crowCompassHeadingString =>
-      (crowBearing == null) ? '?' : angleToCompassHeading(crowBearing);
+      (crowBearing == null) ? '?' : angleToCompassHeading(crowBearing!);
 
   bool get isNearby {
     if (crowDistMeters == null) return false;

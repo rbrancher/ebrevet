@@ -82,6 +82,14 @@ class Region {
     iconURL = regionMap[rid]?['icon_url'] ?? "";
 
     // region secrets are stored in RegionData
+    //
+    // Known key-type mismatch, kept on purpose: the documented RegionData
+    // template types regionSecret as Map<int, String>, but rid is a String,
+    // so with that template this lookup always misses and every region uses
+    // defaultSecret. Changing it could alter start codes and feed signature
+    // checks for real regions in production. Open question for the upstream
+    // maintainer: does the server sign feeds with per-region secrets?
+    // ignore: collection_methods_unrelated_type
     secret = RegionData.regionSecret[rid] ?? RegionData.defaultSecret;
 
     // If a region specifies a server URL, use it verbatim.
@@ -116,7 +124,7 @@ class Region {
     return Region(regionID: rid);
   }
 
-  static fetchRegionsFromDisk({bool create = true}) async {
+  static Future<void> fetchRegionsFromDisk({bool create = true}) async {
     Map<String, dynamic> decodedResponse;
     try {
       MyLogger.entry(
@@ -221,7 +229,7 @@ class Region {
     }
   }
 
-  static updateRegionMap(List<dynamic> decodedRegionList) {
+  static void updateRegionMap(List<dynamic> decodedRegionList) {
     int nListEntries = decodedRegionList.length;
     int nRegions = regionMap.length;
 
@@ -305,7 +313,7 @@ class Region {
         "Added $nAdded, replaced $nReplaced. There are now $nRegions regions.");
   }
 
-  static throwExceptionIfBadMapData(
+  static void throwExceptionIfBadMapData(
       Map<String, dynamic> decodedResponse, String url) {
     if (decodedResponse is List && decodedResponse.isEmpty) {
       throw ServerException('No data from $url');
@@ -322,7 +330,7 @@ class Region {
     // }
   }
 
-  static compareByStateName(String a, String b) {
+  static int compareByStateName(String a, String b) {
     var aCountry = regionMap[a]!['country_code'] ?? '?';
     var bCountry = regionMap[b]!['country_code'] ?? '?';
     var countryCmp = aCountry.compareTo(bCountry);

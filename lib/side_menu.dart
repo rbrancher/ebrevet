@@ -36,7 +36,7 @@ import 'profile_page.dart';
 import 'event_list_page.dart';
 
 class SideMenuDrawer extends StatelessWidget {
-  final Function? onClose;
+  final VoidCallback? onClose;
   const SideMenuDrawer({super.key, this.onClose});
 
   @override

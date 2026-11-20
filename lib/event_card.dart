@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with eBrevet.  If not, see <http://www.gnu.org/licenses/>.
 
+import 'dart:async';
+
 import 'package:ebrevet_card/cert_page.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -37,7 +39,7 @@ import 'checkin_status_page.dart';
 class EventCard extends StatefulWidget {
   final Event event;
   final bool? hasDelete;
-  final Function? onDelete;
+  final VoidCallback? onDelete;
   final VoidCallback? onEventsUpdated;
 
   const EventCard(this.event,
@@ -345,7 +347,9 @@ class _EventCardState extends State<EventCard> {
               switch (activatedEvent!.startStyle) {
                 case StartStyle.massStart:
                   // Auto checkin for massStart is allowed at any (startable) time, any location
-                  activatedEvent!
+                  // Deliberately not awaited: navigation to the controls page
+                  // proceeds while the check-in completes and saves itself.
+                  unawaited(activatedEvent!
                       .controlCheckIn(
                         control: event.controls[event.startControlKey],
                         comment:
@@ -356,7 +360,7 @@ class _EventCardState extends State<EventCard> {
                       )
                       .then((foo) => AppSnack.show(
                           "Mass Start Control Check In at "
-                          "${Utility.toBriefTimeString(event.startTimeWindow.onTime!.toLocal())}"));
+                          "${Utility.toBriefTimeString(event.startTimeWindow.onTime!.toLocal())}")));
                   break;
                 case StartStyle.preRide:
                 case StartStyle.freeStart:
@@ -367,7 +371,8 @@ class _EventCardState extends State<EventCard> {
                         await confirmAutoCheckinDialog(activatedEvent!) ??
                             false;
                     if (doAutoCheckin) {
-                      activatedEvent!
+                      // Deliberately not awaited, as for mass start above.
+                      unawaited(activatedEvent!
                           .controlCheckIn(
                             control: event.controls[event.startControlKey],
                             comment:
@@ -376,7 +381,7 @@ class _EventCardState extends State<EventCard> {
                           )
                           .then((foo) => AppSnack.show(
                               "Automatic Start Control Check In at "
-                              "${Utility.toBriefTimeString(event.startTimeWindow.onTime!.toLocal())}"));
+                              "${Utility.toBriefTimeString(event.startTimeWindow.onTime!.toLocal())}")));
                     }
                   }
                   break;
@@ -387,11 +392,13 @@ class _EventCardState extends State<EventCard> {
 
             // need to save EventHistory now
 
-            MyActivatedEvents.save().then((status) {
+            // Deliberately not awaited: keeps the existing ordering (navigate
+            // without waiting for the save). A failed save is logged below.
+            unawaited(MyActivatedEvents.save().then((status) {
               if (status == false) {
                 MyLogger.entry('Problem saving after activation.');
               }
-            });
+            }));
 
             // It seems excessive to save the whole event history
             // every activation, but this certainly does the job.
@@ -407,7 +414,8 @@ class _EventCardState extends State<EventCard> {
 
           if (context.mounted) {
             // or will get 'don't use context across async gaps warning
-            Navigator.of(context)
+            // Deliberately not awaited: the card rebuilds when the page pops.
+            unawaited(Navigator.of(context)
                 .push(MaterialPageRoute(
                   builder: (context) => overallOutcomeInHistory !=
                           OverallOutcome.finish
@@ -418,7 +426,7 @@ class _EventCardState extends State<EventCard> {
                       : CertificatePage(
                           activatedEvent!), // will implicitly ride event just activated
                 ))
-                .then((_) => setState(() {}));
+                .then((_) => setState(() {})));
           } else {
             MyLogger.entry("Not mounted!?");
           }

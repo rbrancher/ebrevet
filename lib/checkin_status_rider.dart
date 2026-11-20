@@ -24,7 +24,7 @@ class RiderCheckinStatus extends StatelessWidget {
           final rider = riderData;
 
           return RiderCheckinCard(rider: rider, event: event);
-        }).toList(),
+        }),
       ],
     );
   }

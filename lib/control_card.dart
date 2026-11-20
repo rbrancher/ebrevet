@@ -636,9 +636,10 @@ class _ControlCardState extends State<ControlCard> {
     // the list of recent comments and put the new ones into the snackbar.
 
     if (AppSettings.notifyOtherRiderComments.value) {
-      CommentFetcher.fetchAndFlush(activeEvent,
+      // Deliberately not awaited: delayed background fetch of comments.
+      unawaited(CommentFetcher.fetchAndFlush(activeEvent,
           excludeRiderID: AppSettings.rusaID.value,
-          delay: const Duration(seconds: 5));
+          delay: const Duration(seconds: 5)));
     }
   }
 

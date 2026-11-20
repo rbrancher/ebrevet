@@ -85,7 +85,7 @@ class ScheduledEventsSource {
 
   ScheduledEventsSource(this.id);
 
-  get url {
+  String get url {
     var sourceID = AppSettings.scheduleEventsSourceID.value;
     String eventsURL;
     switch (sourceID) {
@@ -101,7 +101,7 @@ class ScheduledEventsSource {
     return eventsURL;
   }
 
-  get secret {
+  String get secret {
     var sourceID = AppSettings.scheduleEventsSourceID.value;
     String secret;
     switch (sourceID) {
@@ -134,7 +134,7 @@ class SourceSelection extends ChangeNotifier {
   SourceSelection()
       : eventInfoSource = ScheduledEventsSource.fromSettingsSourceID();
 
-  updateFromSettings() {
+  void updateFromSettings() {
     // final newEventInfoSource = ScheduledEventsSource.fromSettingsSourceID();
     // if (newEventInfoSource.sourceID != eventInfoSource.sourceID) {
     ScheduledEvents.clear();
@@ -307,12 +307,15 @@ class ScheduledEvents {
       MyLogger.entry("Refresh complete. Write status: $writeStatus");
     } on CueWizardException catch (error) {
       if (context.mounted) {
-        cueWizardErrorDialog(error, scheduleEventsSource, context);
+        // Deliberately not awaited: refresh finishes without waiting for the
+        // rider to dismiss the dialog.
+        unawaited(cueWizardErrorDialog(error, scheduleEventsSource, context));
       }
     } catch (error) {
       if (error is IncompatibleVersionException) {
         if (context.mounted) {
-          versionErrorDialog(error, scheduleEventsSource, context);
+          // Deliberately not awaited, as above.
+          unawaited(versionErrorDialog(error, scheduleEventsSource, context));
         }
         events.clear();
       } else {
@@ -471,7 +474,7 @@ class ScheduledEvents {
     }
 
     if (true == decodedResponse.containsKey('event_errors') &&
-        decodedResponse['event_errors'].isNotEmpty) {
+        (decodedResponse['event_errors'] as List).isNotEmpty) {
       List<String> eventErrors =
           List<String>.from(decodedResponse['event_errors'] as List);
       throw CueWizardException(eventErrors);

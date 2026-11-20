@@ -31,7 +31,7 @@ class MockServer {
   /// Secret used to sign event feeds. Defaults to the secret the app
   /// will verify with, so the signature check passes.
   static String Function() signingSecret =
-      () => ScheduledEventsSource.fromSettingsSourceID().secret as String;
+      () => ScheduledEventsSource.fromSettingsSourceID().secret;
 
   /// Clock, overridable in tests.
   static DateTime Function() now = DateTime.now;

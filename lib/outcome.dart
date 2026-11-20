@@ -41,7 +41,7 @@ enum OverallOutcome {
     unknown: 'Unknown',
   };
 
-  get description => _description[this];
+  String get description => _description[this];
 }
 
 // The plural (outcomeS versus outcome) refers to the multiple outcomes within a single event -- overall and control times
@@ -131,11 +131,11 @@ class EventOutcomes {
     _overallOutcome = oo;
   }
 
-  get description {
+  String get description {
     return _overallOutcome.description;
   }
 
-  get outcomeName => _overallOutcome.name;
+  String get outcomeName => _overallOutcome.name;
 
   List<List<String>> get checkInTimeList {
     List<List<String>> citl = [];
