@@ -139,8 +139,7 @@ class ActivatedEvent {
             style: AppSnackStyle.error);
       } else {
         outcomes.overallOutcome = OverallOutcome.dnqSkipped;
-        AppSnack.show(
-            'Failed to check into one or more intermediate controls!',
+        AppSnack.show('Failed to check into one or more intermediate controls!',
             style: AppSnackStyle.error);
       }
     }

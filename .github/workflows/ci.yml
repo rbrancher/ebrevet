@@ -23,7 +23,13 @@ jobs:
         run: cp harness/ci/region_data.stub.dart lib/region_data.dart
       - name: Validate intents
         run: python3 harness/scripts/intents.py validate
+      - name: Lint workflows (actionlint)
+        uses: docker://rhysd/actionlint:1.7.7
+        with:
+          args: -color
       - run: flutter pub get
+      - name: Check formatting
+        run: dart format --output=none --set-exit-if-changed lib test
       - run: flutter analyze
       - run: flutter test --coverage
       - name: Build web (mock mode)

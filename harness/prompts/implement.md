@@ -10,7 +10,7 @@ Steps:
 4. For each acceptance criterion add or update a test under `test/` (unit or widget test, mock mode)
    and reference it in a comment like `// AC1 (intent <id>)`.
 5. Loop until all are green:
-   `flutter analyze` (no new issues), `flutter test`, `flutter build web --dart-define=EBREVET_MOCK=true`.
+   `dart format lib test` (commit the result), `flutter analyze` (no new issues), `flutter test`, `flutter build web --dart-define=EBREVET_MOCK=true`.
 6. Tick the acceptance-criteria checkboxes you satisfied in the intent file. Do not add a `status`
    field: the intent counts as built once a human merges your PR. Commit.
 7. Push and open a PR titled `<id>: <title>` (keep this exact form; it marks the intent built if squash-merged). The body must contain:

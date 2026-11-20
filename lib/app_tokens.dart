@@ -100,8 +100,8 @@ class AppTokens extends ThemeExtension<AppTokens> {
   /// status pairs) and [textTheme].
   factory AppTokens.fromScheme(ColorScheme scheme, TextTheme textTheme) {
     StatusColors custom(Color source) {
-      final s =
-          ColorScheme.fromSeed(seedColor: source, brightness: scheme.brightness);
+      final s = ColorScheme.fromSeed(
+          seedColor: source, brightness: scheme.brightness);
       return StatusColors(s.primaryContainer, s.onPrimaryContainer);
     }
 

@@ -19,8 +19,11 @@ void main() {
 
     final plain =
         '${event.cueVersion}-${event.eventID}-$rider-${event.region.secret}';
-    final expected =
-        sha256.convert(utf8.encode(plain)).toString().substring(0, 4).toUpperCase();
+    final expected = sha256
+        .convert(utf8.encode(plain))
+        .toString()
+        .substring(0, 4)
+        .toUpperCase();
     expect(code, expected);
     expect(code, hasLength(4));
   });

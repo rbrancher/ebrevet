@@ -67,8 +67,8 @@ class DayNight extends ChangeNotifier {
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: scheme.inverseSurface,
-        contentTextStyle: base.textTheme.bodyMedium
-            ?.copyWith(color: scheme.onInverseSurface),
+        contentTextStyle:
+            base.textTheme.bodyMedium?.copyWith(color: scheme.onInverseSurface),
         actionTextColor: scheme.inversePrimary,
         shape: shape,
         insetPadding: EdgeInsets.all(tokens.spaceMedium),

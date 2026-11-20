@@ -47,8 +47,10 @@ void main() {
 
   group('MockServer routing', () {
     test('GET scheduled_events with nonce is routed and signed', () async {
-      final r = await MockServer.handle(http.Request('GET',
-          Uri.parse('https://randonneuring.org/ebrevet/scheduled_events/938017/n0nce')));
+      final r = await MockServer.handle(http.Request(
+          'GET',
+          Uri.parse(
+              'https://randonneuring.org/ebrevet/scheduled_events/938017/n0nce')));
       expect(r.statusCode, 200);
       expect(jsonDecode(r.body)['nonce'], 'n0nce');
     });
