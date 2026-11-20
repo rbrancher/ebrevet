@@ -28,7 +28,7 @@ rules, only commented-out overrides. Newer rules surface real issues that CI mis
 As a maintainer, I want a stricter static-analysis bar and a working per-region secret lookup so that silent failures and type bugs are caught in CI and regions with their own secret use it.
 
 ## Acceptance criteria
-- [ ] AC1: `flutter_lints` is upgraded to 6.x in `pubspec.yaml` (raising the Dart SDK constraint only as far as that version requires), and `flutter pub get` resolves. `flutter analyze` reports no issues.
+- [ ] AC1: `flutter_lints` is upgraded to 6.x in `pubspec.yaml`, and `flutter pub get` resolves. Do **not** change the `environment: sdk` constraint. Dart 3 already resolves `flutter_lints` 6 against `'>=2.18.6 <3.0.0'` (checked). Raising the lower bound to 3.7 or above would switch `dart format` to the tall style and reformat almost every file. `flutter analyze` reports no issues.
 - [ ] AC2: `analysis_options.yaml` enables `unawaited_futures` and `avoid_dynamic_calls`, and the commented-out rule overrides are removed. `flutter analyze` is clean, with no `// ignore` comments added to get there.
 - [ ] AC3: Each deliberately un-awaited future is wrapped in `unawaited(...)` with a short comment saying why. Each future that should be awaited is awaited, keeping the existing error handling.
 - [ ] AC4: Findings from the new `flutter_lints` rules (mostly `strict_top_level_inference`) are fixed with type annotations and no behaviour change.
@@ -48,4 +48,4 @@ As a maintainer, I want a stricter static-analysis bar and a working per-region 
 - Run `flutter analyze`, `flutter test` and the format check. Nothing needs checking in the preview, since there are no UI changes.
 
 ## UI notes
-None. Risk is `high` because the change touches server reporting, persisted ride-state saves (awaiting or `unawaited` on writes) and secret selection, which feeds code generation. Review each `unawaited_futures` fix for ordering changes. The Dart SDK constraint bump may be needed for `flutter_lints` 6, and reviewers should check that the CI Flutter version supports it.
+None. Risk is `high` because the change touches server reporting, persisted ride-state saves (awaiting or `unawaited` on writes) and secret selection, which feeds code generation. Review each `unawaited_futures` fix for ordering changes. No SDK constraint bump is needed for `flutter_lints` 6 (see AC1).
