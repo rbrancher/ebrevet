@@ -9,6 +9,11 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
+import '../activated_event.dart';
+import '../app_settings.dart';
+import '../event.dart';
+import '../files.dart';
+import '../outcome.dart';
 import '../region.dart';
 import '../scheduled_events.dart';
 
@@ -114,6 +119,60 @@ class MockServer {
     };
     feed['signature'] = ScheduledEvents.signJson(feed, signingSecret());
     return feed;
+  }
+
+  /// Rider ID of the demo rider set up in mock mode (main.dart).
+  static const demoRiderID = '12345';
+
+  /// Past rides for the demo rider, so mock-mode previews show non-zero
+  /// profile stats (intent 0006). Built from the fixture, re-dated into the
+  /// past with a "-demo" event ID: finished 200 (twice, one a pre-ride),
+  /// 300 and 400 km rides, plus a DNF on the 600.
+  static Future<Map<String, ActivatedEvent>> demoRides() async {
+    final fixture = jsonDecode(await loadFixture()) as Map<String, dynamic>;
+    final events = (fixture['event_list'] as List).cast<Map<String, dynamic>>();
+    final t0 = now().toUtc();
+    // [fixture index, days ago, outcome, start style]
+    final plan = [
+      [2, 30, OverallOutcome.finish, StartStyle.massStart], // 200
+      [4, 45, OverallOutcome.finish, StartStyle.preRide], // 200
+      [0, 60, OverallOutcome.finish, StartStyle.massStart], // 300
+      [1, 90, OverallOutcome.finish, StartStyle.massStart], // 400
+      [3, 120, OverallOutcome.dnf, StartStyle.massStart], // 600
+    ];
+    final rides = <String, ActivatedEvent>{};
+    for (final p in plan) {
+      final json = shiftEvent(
+          events[p[0] as int], t0.subtract(Duration(days: p[1] as int)));
+      json['event_id'] = '${json['event_id']}-demo';
+      final event = Event.fromJson(json);
+      final outcome = p[2] as OverallOutcome;
+      final outcomes = EventOutcomes(overallOutcome: outcome);
+      final checked = outcome == OverallOutcome.finish
+          ? event.controls
+          : event.controls.take(2);
+      for (final c in checked) {
+        outcomes.setControlCheckInTime(c.index, c.open);
+      }
+      rides[event.eventID] =
+          ActivatedEvent(event, demoRiderID, outcomes, p[3] as StartStyle);
+    }
+    return rides;
+  }
+
+  /// Adds [demoRides] missing from the saved ride history. Called only in
+  /// mock mode, before the history is loaded. Saved rides are kept.
+  static Future<void> seedDemoRides() async {
+    final storage = FileStorage(AppSettings.pastEventsFileName);
+    final saved = await storage.readJSON();
+    var added = false;
+    for (final e in (await demoRides()).entries) {
+      if (!saved.containsKey(e.key)) {
+        saved[e.key] = e.value.toJson();
+        added = true;
+      }
+    }
+    if (added) await storage.writeJSON(saved);
   }
 
   /// Copy [event] so it starts at [newStart], moving every control window by

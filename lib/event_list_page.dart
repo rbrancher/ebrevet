@@ -30,6 +30,7 @@ import 'side_menu.dart';
 import 'settings_page.dart';
 import 'location.dart';
 import 'event.dart';
+import 'profile_page.dart';
 
 class ScheduledEventsPage extends StatefulWidget {
   final EventFilter eventFilter;
@@ -78,7 +79,9 @@ class _ScheduledEventsPageState extends State<ScheduledEventsPage> {
               icon: dayNight.icon,
               onPressed: () {
                 dayNight.toggleMode();
-              })
+              }),
+          // Last (rightmost) action, after the day/night toggle (intent 0006).
+          ProfileAvatarButton(onClose: () => setState(() {})),
         ],
       ),
       drawer: SideMenuDrawer(
