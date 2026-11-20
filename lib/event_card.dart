@@ -35,6 +35,7 @@ import 'mylogger.dart';
 import 'control_state.dart';
 import 'utility.dart';
 import 'checkin_status_page.dart';
+import 'route_sketch.dart';
 
 class EventCard extends StatefulWidget {
   final Event event;
@@ -88,22 +89,51 @@ class _EventCardState extends State<EventCard> {
     final bool isOutcomeFullyUploaded =
         activatedEvent?.isCurrentOutcomeFullyUploaded ?? false;
 
+    final textTheme = Theme.of(context).textTheme;
+    final scheme = Theme.of(context).colorScheme;
+
+    // Material 3 card anatomy (intent 0009): media (route sketch), headline,
+    // subhead, supporting text, actions.
     return Card(
+      clipBehavior: Clip.antiAlias,
       // Overall the Card is a Column
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          // Main body of Card is a List Tile
-          ListTile(
-            leading: IconButton(
-              onPressed: () {
-                openEventInfoDialog(event);
-              },
-              icon: const Icon(Icons.info_outline),
-            ),
-            trailing: Wrap(
-              spacing: 4,
+          RouteSketch(controls: event.controls),
+          // Headline and subhead, with the info and check-ins buttons
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 4, 0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          event.nameDist,
+                          style: textTheme.titleLarge
+                              ?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                        Text(
+                          regionName,
+                          style: textTheme.bodyMedium
+                              ?.copyWith(color: scheme.onSurfaceVariant),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () {
+                    openEventInfoDialog(event);
+                  },
+                  tooltip: 'Event Info',
+                  icon: const Icon(Icons.info_outline),
+                ),
                 IconButton(
                   icon: const Icon(Icons.checklist_rtl),
                   tooltip: 'View Check-Ins',
@@ -116,43 +146,42 @@ class _EventCardState extends State<EventCard> {
                     );
                   },
                 ),
-                // if (activatedEvent != null)
-                //   IconButton(
-                //     icon: const Icon(Icons.comment),
-                //     tooltip: 'Show all comments',
-                //     onPressed: () {
-                //       CommentFetcher.fetchAndFlush(activatedEvent!,
-                //           allNew: true);
-                //     },
-                //   ),
               ],
             ),
-            title: Text(
-              event.nameDist,
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(regionName),
-                Text('${event.startCity}, ${event.startState}'),
-                Text(event.startTimeWindow.startStyle.description),
-                if (event.gravelDistance > 0)
-                  Text('Gravel: ${event.gravelDistance}K of ${event.distance}K'
-                      ' (${(100.0 * event.gravelDistance / event.distance).round()}%) unpaved'),
-                if (event.startTimeWindow.onTime != null && !event.isUnderway)
-                  Text(
-                    '${event.dateTime} (${event.eventStatusText})',
-                  ),
-                if (event.startTimeWindow.onTime != null && event.isUnderway)
-                  const Text(
-                    'UNDERWAY!',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                Text('Latest Cue Ver: ${event.cueVersionString}'),
-              ],
+          ),
+          // Supporting text
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: DefaultTextStyle.merge(
+                style: textTheme.bodyMedium,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('${event.startCity}, ${event.startState}'),
+                    Text(event.startTimeWindow.startStyle.description),
+                    if (event.gravelDistance > 0)
+                      Text(
+                          'Gravel: ${event.gravelDistance}K of ${event.distance}K'
+                          ' (${(100.0 * event.gravelDistance / event.distance).round()}%) unpaved'),
+                    if (event.startTimeWindow.onTime != null &&
+                        !event.isUnderway)
+                      Text(
+                        '${event.dateTime} (${event.eventStatusText})',
+                      ),
+                    if (event.startTimeWindow.onTime != null &&
+                        event.isUnderway)
+                      const Text(
+                        'UNDERWAY!',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    Text('Latest Cue Ver: ${event.cueVersionString}'),
+                  ],
+                ),
+              ),
             ),
           ),
           // Below the List tile is a row with the ride button
