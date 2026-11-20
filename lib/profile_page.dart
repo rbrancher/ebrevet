@@ -1,6 +1,6 @@
 // Read-only rider profile with ride stats (intent 0006). Shows who the app
 // thinks the rider is and a summary of finished rides saved on this phone.
-// Editing the rider lives in Settings for now.
+// The Edit action opens the rider edit form (intent 0007).
 
 import 'package:flutter/material.dart';
 
@@ -10,6 +10,7 @@ import 'app_tokens.dart';
 import 'my_activated_events.dart';
 import 'my_activated_events_page.dart';
 import 'profile_stats.dart';
+import 'rider_edit_page.dart';
 
 /// Up to two initials from the rider's first and last name, or '' if no
 /// name is set.
@@ -74,11 +75,22 @@ class ProfileAvatarButton extends StatelessWidget {
   }
 }
 
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends StatefulWidget {
   /// Rides to summarise. Defaults to the rides saved on this phone.
   final List<ActivatedEvent>? rides;
 
   const ProfilePage({super.key, this.rides});
+
+  @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  Future<void> _edit() async {
+    await Navigator.of(context).push(MaterialPageRoute(
+        fullscreenDialog: true, builder: (context) => const RiderEditPage()));
+    if (mounted) setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -87,7 +99,7 @@ class ProfilePage extends StatelessWidget {
     final textTheme = theme.textTheme;
     final tokens = AppTokens.of(context);
     final stats = ProfileStats.from(
-        rides ?? MyActivatedEvents.myActivatedEventsList,
+        widget.rides ?? MyActivatedEvents.myActivatedEventsList,
         AppSettings.rusaID.value);
 
     final name = AppSettings.fullName.trim();
@@ -187,7 +199,16 @@ class ProfilePage extends StatelessWidget {
     return Scaffold(
       body: CustomScrollView(
         slivers: [
-          const SliverAppBar.medium(title: Text('Profile')),
+          SliverAppBar.medium(
+            title: const Text('Profile'),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.edit),
+                tooltip: 'Edit',
+                onPressed: _edit,
+              ),
+            ],
+          ),
           SliverList(
             delegate: SliverChildListDelegate([
               header,

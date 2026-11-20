@@ -26,6 +26,8 @@ import 'app_settings.dart';
 import 'settings_tiles.dart';
 import 'my_settings.dart';
 import 'region.dart';
+import 'app_tokens.dart';
+import 'rider_edit_page.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({
@@ -64,11 +66,6 @@ class SettingsPageState extends State<SettingsPage> {
           children: [
             Column(
               children: [
-                RequiredAppSettings(
-                  collapsed: true,
-                  onContinue: () => setState(() {}),
-                ),
-                spacerBox,
                 const EventSearchSettings(),
                 spacerBox,
                 OptionalAppSettings(
@@ -346,78 +343,48 @@ class _AdvancedSettingsState extends State<AdvancedSettings> {
   }
 }
 
-class RequiredAppSettings extends StatelessWidget {
+/// First-run screen (intent 0007): the shared rider form ([RiderForm]) with
+/// a Continue action that saves and then calls [onContinue]. Rider details
+/// are edited from the Profile page after first run, not from Settings.
+class RequiredAppSettings extends StatefulWidget {
   final void Function()? onContinue;
-  final bool collapsed;
 
   const RequiredAppSettings({
     super.key,
     this.onContinue,
-    this.collapsed = true,
   });
 
-  final spacerBox = const SizedBox(
-    height: 10,
-  );
+  @override
+  State<RequiredAppSettings> createState() => _RequiredAppSettingsState();
+}
+
+class _RequiredAppSettingsState extends State<RequiredAppSettings> {
+  final _form = GlobalKey<RiderFormState>();
+
+  Future<void> _continue() async {
+    if (await (_form.currentState?.save() ?? Future.value(false))) {
+      widget.onContinue?.call();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    if (collapsed) {
-      return Material(
-        color: Colors.transparent,
-        child: ExpansionTile(
-          title: const Text('Rider Settings'),
-          subtitle: const Text('Name and ID'),
-          children: [
-            DialogInputSettingsTile(AppSettings.firstName),
-            DialogInputSettingsTile(AppSettings.lastName),
-            DialogInputSettingsTile(
-              AppSettings.rusaID,
-              onChanged: () {
-                if (AppSettings.rusaID.value != AppSettings.magicRUSAID) {
-                  MySetting.clearDeveloperOptions().then((_) {
-                    onContinue!.call();
-                  });
-                } else {
-                  MyLogger.entry("Developer Options Enabled",
-                      severity: Severity.warning);
-                  onContinue!.call();
-                }
-              },
-            ),
-          ],
+    final tokens = AppTokens.of(context);
+    return ListView(
+      children: [
+        Text(
+          'Required Settings',
+          style: Theme.of(context).textTheme.bodyLarge,
         ),
-      );
-    } else {
-      return ListView(
-        children: [
-          Text(
-            'Required Settings',
-            style: Theme.of(context).textTheme.bodyLarge,
-          ),
-          Text(
-            'Enter your First Name, Last Name, and Rider ID',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          // Text(
-          //   'and the Region for downloading future events',
-          //   style: Theme.of(context).textTheme.bodySmall,
-          // ),
-          spacerBox,
-          DialogInputSettingsTile(AppSettings.firstName),
-          DialogInputSettingsTile(AppSettings.lastName),
-          DialogInputSettingsTile(
-            AppSettings.rusaID,
-            onChanged: () {
-              if (AppSettings.rusaID.value != AppSettings.magicRUSAID) {
-                MySetting.clearDeveloperOptions();
-              }
-            },
-          ),
-          spacerBox,
-          FilledButton(onPressed: onContinue, child: const Text('Continue')),
-        ],
-      );
-    }
+        Text(
+          'Enter your First Name, Last Name, and Rider ID',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        SizedBox(height: tokens.spaceMedium),
+        RiderForm(key: _form),
+        SizedBox(height: tokens.spaceMedium),
+        FilledButton(onPressed: _continue, child: const Text('Continue')),
+      ],
+    );
   }
 }

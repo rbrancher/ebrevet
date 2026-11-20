@@ -33,40 +33,40 @@ changing my Rider ID.
 Rider ID is an input to start codes, so this slice changes only where and how the existing
 settings are edited. Code generation, check-in rules and persisted ride state are not edited.
 
-- [ ] AC1: A new full-screen `RiderEditPage` (`lib/rider_edit_page.dart`) has three text
+- [x] AC1: A new full-screen `RiderEditPage` (`lib/rider_edit_page.dart`) has three text
       fields (First Name, Last Name, Rider ID) prefilled from `AppSettings`, with Save and
       Cancel actions (close icon plus Save in the app bar, per the Material full-screen
       dialog pattern). It is not an `AlertDialog`.
-- [ ] AC2: Inline validation reuses the `AppSettings.firstName/lastName/rusaID` validators
+- [x] AC2: Inline validation reuses the `AppSettings.firstName/lastName/rusaID` validators
       (`notEmptyValidator`, `numericIDValidator`). Errors show under the field, and Save with
       an invalid field writes nothing and stays on the page.
-- [ ] AC3: Save writes all changed values via `MySetting.setValue` and pops. Cancel and
+- [x] AC3: Save writes all changed values via `MySetting.setValue` and pops. Cancel and
       back with no changes pop silently. Cancel or back with unsaved changes asks
       "Discard changes?" with Discard / Keep editing. Keep editing stays with edits intact.
-- [ ] AC4: The Profile page has an Edit action in its app bar that opens `RiderEditPage`.
+- [x] AC4: The Profile page has an Edit action in its app bar that opens `RiderEditPage`.
       After saving, the Profile header (name, initials, Rider ID) shows the new values,
       and so do the event list app bar avatar and drawer header when next shown. A widget
       test covers the header update.
-- [ ] AC5: Developer-options behaviour on a Rider ID change matches today. If the saved ID
+- [x] AC5: Developer-options behaviour on a Rider ID change matches today. If the saved ID
       differs from the stored one and is not `AppSettings.magicRUSAID`,
       `MySetting.clearDeveloperOptions()` runs. If it equals the magic ID, developer options
       stay available and a warning is logged. If the ID is unchanged, nothing is cleared.
       Tests cover all three.
-- [ ] AC6: When the Rider ID field differs from the stored non-empty ID, the form shows a
+- [x] AC6: When the Rider ID field differs from the stored non-empty ID, the form shows a
       warning that start codes depend on the Rider ID and that rides under the old ID will
       not count in the profile stats. It is hidden when the ID is unchanged and on first run
       (stored ID empty). A test covers shown and hidden.
-- [ ] AC7: The first-run "Required Settings" screen (`RequiredAppSettings(collapsed: false)`
+- [x] AC7: The first-run "Required Settings" screen (`RequiredAppSettings(collapsed: false)`
       on the event list) uses the same form widget (shared body, no duplicated field or
       validation code) with a Continue/Save action. Saving calls `onContinue` and leaves the
       user on the event list with settings applied. Existing first-run behaviour in
       `test/remaining_screens_test.dart` is updated, not dropped.
-- [ ] AC8: Settings no longer contains the "Rider Settings" section or any rider field
+- [x] AC8: Settings no longer contains the "Rider Settings" section or any rider field
       tiles, and has no other way to edit them. A test asserts they are absent.
-- [ ] AC9: Styling uses theme color roles, `AppTokens` and `textTheme` only. The
+- [x] AC9: Styling uses theme color roles, `AppTokens` and `textTheme` only. The
       `test/style_guardrail_test.dart` baseline stays empty. New form controls pass
       `androidTapTargetGuideline` and `textContrastGuideline` in light and dark.
-- [ ] AC10: `flutter analyze` and `flutter test` stay green. Tests use no network and no
+- [x] AC10: `flutter analyze` and `flutter test` stay green. Tests use no network and no
       real location.
 
 ## Out of scope
