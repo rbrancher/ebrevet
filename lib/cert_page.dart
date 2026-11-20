@@ -206,7 +206,7 @@ class _CertificatePageState extends State<CertificatePage> {
                               const Text('Completed the', style: emStyle),
                               Text(event.region.regionName, style: titleMedium),
                               Text(
-                                '${event.nameDist}',
+                                event.nameDist,
                                 style:
                                     titleLarge, // whatever style you already have
                               ),

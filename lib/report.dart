@@ -37,14 +37,16 @@ class Report {
     ActivatedEvent pe, {
     Control? control,
     String? comment,
-    Function? onUploadDone,
+    Function()? onUploadDone,
   }) async {
     _reportingEvent = pe;
 
     Map<String, dynamic> report =
         _constructReport(controlIndex: control?.index, comment: comment);
 
-    _sendReportToServer(report).then((response) {
+    // Deliberately not awaited: callers get control back before the upload
+    // finishes. Errors are handled by catchError below.
+    unawaited(_sendReportToServer(report).then((response) {
       _recordReportResponse(response);
       lastSuccessfulServerAccess = DateTime.now();
       AppSnack.show("Current checkin status uploaded.");
@@ -65,14 +67,14 @@ class Report {
       // EventHistory.save();
 
       onUploadDone?.call();
-    });
+    }));
   }
 
   static void _recordReportResponse(http.Response response) {
     String? result;
     if (response.statusCode == 200) {
       try {
-        var r = jsonDecode(response.body);
+        var r = jsonDecode(response.body) as Map<String, dynamic>;
         var status = (r.containsKey('status')) ? r['status'] : '';
         if (status == 'OK') {
           var now = DateTime.now().toUtc();

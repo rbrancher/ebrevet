@@ -54,7 +54,7 @@ enum StartStyle {
     preRide: 'Volunteer pre-ride',
   };
 
-  get description => _description[this];
+  String get description => _description[this];
 }
 
 enum EventFilter {
@@ -252,7 +252,7 @@ class Event {
     //    : int.tryParse(json['club_acp_code'])!;
 
     if (false == json.containsKey('checkin_post_url') ||
-        json['checkin_post_url']!.isEmpty) {
+        (json['checkin_post_url'] as String).isEmpty) {
       throw const FormatException('No URL specified for upload');
     }
     checkinPostURL = json['checkin_post_url']!;
@@ -278,7 +278,7 @@ class Event {
     // }
   }
 
-  get nameDist {
+  String get nameDist {
     return '$name ${distance}K';
   }
 
@@ -317,12 +317,12 @@ class Event {
   DateTime? get latestFinishTime => latestStartTime?.add(allowedDuration);
   DateTime? get earliestFinishTime => earliestStartTime?.add(allowedDuration);
 
-  get isFuture {
+  bool get isFuture {
     final now = DateTime.now();
     return finishControlCloseTime.isBefore(now);
   }
 
-  get dateTime {
+  String get dateTime {
     if (startTimeWindow.startStyle == StartStyle.permanent ||
         startTimeWindow.onTime == null) {
       return "Ride any time";
@@ -341,7 +341,7 @@ class Event {
     }
   }
 
-  get startDate {
+  String get startDate {
     if (startTimeWindow.startStyle == StartStyle.permanent ||
         startTimeWindow.onTime == null) {
       return "Any date";
@@ -351,7 +351,7 @@ class Event {
     return sdtl.toString().substring(0, 10);
   }
 
-  get eventStatusText {
+  String get eventStatusText {
     if (startTimeWindow.startStyle == StartStyle.permanent ||
         startTimeWindow.onTime == null) {
       return "Any Time";
@@ -370,7 +370,7 @@ class Event {
     }
   }
 
-  get isUnderway {
+  bool get isUnderway {
     if (startTimeWindow.startStyle == StartStyle.permanent ||
         startTimeWindow.onTime == null) {
       return false;
@@ -407,9 +407,9 @@ class Event {
 
   bool get isGravel => (gravelDistance > 0);
 
-  bool isIntermediateControl(control) =>
+  bool isIntermediateControl(Control control) =>
       control.index != finishControlKey && control.index != startControlKey;
-  bool isFinishControl(control) => control.index == finishControlKey;
+  bool isFinishControl(Control control) => control.index == finishControlKey;
 
   bool isUntimedControl(Control c) {
     return c.style.isUntimedStyle ||

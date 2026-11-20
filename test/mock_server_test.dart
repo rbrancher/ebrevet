@@ -21,7 +21,7 @@ void main() {
     test('first event started 20 minutes ago, others start on later days',
         () async {
       final feed = await MockServer.scheduledEvents();
-      final events = feed['event_list'] as List;
+      final events = (feed['event_list'] as List).cast<Map<String, dynamic>>();
       expect(events, isNotEmpty);
       expect(DateTime.parse(events[0]['start_datetime_utc']),
           testNow.subtract(const Duration(minutes: 20)));
@@ -31,9 +31,10 @@ void main() {
 
     test('control windows move with the event start', () async {
       final feed = await MockServer.scheduledEvents();
-      final e = (feed['event_list'] as List)[0];
+      final e = (feed['event_list'] as List)[0] as Map<String, dynamic>;
       final start = DateTime.parse(e['start_datetime_utc']);
-      final firstOpen = DateTime.parse(e['controls'][0]['open']);
+      final controls = (e['controls'] as List).cast<Map<String, dynamic>>();
+      final firstOpen = DateTime.parse(controls[0]['open']);
       expect(firstOpen, start); // start control opens at the start time
     });
 
@@ -52,16 +53,18 @@ void main() {
           Uri.parse(
               'https://randonneuring.org/ebrevet/scheduled_events/938017/n0nce')));
       expect(r.statusCode, 200);
-      expect(jsonDecode(r.body)['nonce'], 'n0nce');
+      expect((jsonDecode(r.body) as Map<String, dynamic>)['nonce'], 'n0nce');
     });
 
     test('region list has the shape Region.fetchRegionsFromServer expects',
         () async {
       final r = await MockServer.handle(http.Request(
           'GET', Uri.parse('https://randonneuring.org/ebrevet/region_list')));
-      final body = jsonDecode(r.body);
+      final body = jsonDecode(r.body) as Map<String, dynamic>;
       expect(DateTime.tryParse(body['timestamp']), isNotNull);
-      expect((body['region_list'] as List).first['club_acp_code'], isNotNull);
+      final regions =
+          (body['region_list'] as List).cast<Map<String, dynamic>>();
+      expect(regions.first['club_acp_code'], isNotNull);
     });
 
     test('check-in POST is captured and answered OK, never sent anywhere',
@@ -69,7 +72,7 @@ void main() {
       final req = http.Request('POST', Uri.parse(MockServer.checkinPostURL))
         ..body = jsonEncode({'event_id': '938017-382', 'rider_id': '1234'});
       final r = await MockServer.handle(req);
-      expect(jsonDecode(r.body)['status'], 'OK');
+      expect((jsonDecode(r.body) as Map<String, dynamic>)['status'], 'OK');
       expect(MockServer.receivedReports.single['rider_id'], '1234');
     });
 

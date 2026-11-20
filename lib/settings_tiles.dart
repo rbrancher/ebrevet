@@ -111,7 +111,7 @@ class DialogInputSettingsTileState extends State<DialogInputSettingsTile> {
       onTap: () async {
         final stringEntered = await openEditDialog();
         if (stringEntered != null) {
-          widget.mySetting.setValueFromString(stringEntered).then((_) {
+          await widget.mySetting.setValueFromString(stringEntered).then((_) {
             widget.onChanged?.call();
             setState(() {});
           });

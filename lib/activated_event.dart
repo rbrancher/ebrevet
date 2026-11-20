@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with eBrevet.  If not, see <http://www.gnu.org/licenses/>.
 
+import 'dart:async';
+
 import 'event.dart';
 import 'outcome.dart';
 import 'control.dart';
@@ -156,15 +158,17 @@ class ActivatedEvent {
       controlState.checkIn();
     }
 
-    Report.constructReportAndSend(this, control: control, comment: comment,
-        onUploadDone: () async {
+    // Deliberately not awaited: the check-in is already saved locally, so the
+    // upload runs in the background and reports its own errors.
+    unawaited(Report.constructReportAndSend(this,
+        control: control, comment: comment, onUploadDone: () async {
       var status = await MyActivatedEvents.save();
       if (status == false) {
         return 'Failed to save check-in again after sending report.';
       }
 
       if (controlState != null) controlState.reportUploaded();
-    });
+    }));
 
     return null;
   }
@@ -535,7 +539,6 @@ class ActivatedEvent {
   }
 
   String get overallOutcomeDescription {
-    return outcomes.overallOutcome.description ??
-        OverallOutcome.unknown.description;
+    return outcomes.overallOutcome.description;
   }
 }

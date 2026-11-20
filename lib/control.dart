@@ -121,9 +121,9 @@ class Control {
     return s;
   }
 
-  get openTimeString =>
+  String get openTimeString =>
       open.toLocal().toString().substring(0, 16) + open.toLocal().timeZoneName;
-  get closeTimeString =>
+  String get closeTimeString =>
       close.toLocal().toString().substring(0, 16) +
       close.toLocal().timeZoneName;
 }

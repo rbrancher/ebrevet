@@ -121,7 +121,7 @@ class MySetting<T> {
   //   }
   // }
 
-  setValue(T val) async {
+  Future<void> setValue(T val) async {
     String s;
     if (defaultValue is Enum) {
       s = (val as Enum).index.toString();
@@ -133,7 +133,7 @@ class MySetting<T> {
     onChanged?.call();
   }
 
-  setValueFromString(String val) async {
+  Future<void> setValueFromString(String val) async {
     MyLogger.entry('Setting $key to $val');
     await prefs.setString(key, val);
   }
