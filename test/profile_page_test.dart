@@ -22,6 +22,7 @@ import 'package:ebrevet_card/my_settings.dart';
 import 'package:ebrevet_card/outcome.dart';
 import 'package:ebrevet_card/profile_page.dart';
 import 'package:ebrevet_card/profile_stats.dart';
+import 'package:ebrevet_card/rider_edit_page.dart';
 import 'package:ebrevet_card/scheduled_events.dart';
 import 'package:ebrevet_card/side_menu.dart';
 import 'package:ebrevet_card/snackbarglobal.dart';
@@ -150,8 +151,13 @@ void main() {
       expect(tester.getTopLeft(find.byType(CircleAvatar)).dy,
           greaterThanOrEqualTo(112));
 
-      // Read-only: no edit controls.
-      expect(find.byIcon(Icons.edit), findsNothing);
+      // Read-only body: the only edit control is the app bar Edit action
+      // (intent 0007, AC4).
+      expect(find.byIcon(Icons.edit), findsOneWidget);
+      expect(
+          find.descendant(
+              of: find.byType(AppBar), matching: find.byIcon(Icons.edit)),
+          findsOneWidget);
       expect(find.byType(TextField), findsNothing);
       expect(find.byType(Dialog), findsNothing);
 
@@ -430,5 +436,51 @@ void main() {
     ]) {
       expect(countViolations(File(path).readAsStringSync()), 0, reason: path);
     }
+  });
+
+  // AC4 (intent 0007): Edit opens the rider form; after Save the header,
+  // the event list avatar and the drawer header show the new values.
+  testWidgets('profile Edit opens RiderEditPage and Save updates the header',
+      (tester) async {
+    await http.runWithClient(() async {
+      await tester.pumpWidget(app(const ScheduledEventsPage()));
+      await pumpFor(tester, const Duration(seconds: 1));
+      await tester.tap(find.byType(ProfileAvatarButton));
+      await tester.pumpAndSettle();
+      expect(find.text('Test Rider'), findsOneWidget);
+      expect(find.text('TR'), findsOneWidget);
+      expect(find.text('Rider ID: 12345'), findsOneWidget);
+
+      final edit = find.widgetWithIcon(IconButton, Icons.edit);
+      expect(find.descendant(of: find.byType(AppBar), matching: edit),
+          findsOneWidget);
+      await tester.tap(edit);
+      await tester.pumpAndSettle();
+      expect(find.byType(RiderEditPage), findsOneWidget);
+
+      await tester.enterText(find.byType(TextFormField).at(0), 'Ann');
+      await tester.enterText(find.byType(TextFormField).at(1), 'Other');
+      await tester.enterText(find.byType(TextFormField).at(2), '777');
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+      expect(find.byType(RiderEditPage), findsNothing);
+      expect(find.byType(ProfilePage), findsOneWidget);
+      expect(find.text('Ann Other'), findsOneWidget);
+      expect(find.text('AO'), findsOneWidget);
+      expect(find.text('Rider ID: 777'), findsOneWidget);
+
+      // Back to the event list: the app bar avatar shows the new initials.
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(
+          find.descendant(
+              of: find.byType(ProfileAvatarButton), matching: find.text('AO')),
+          findsOneWidget);
+      // And the drawer header shows the new rider.
+      tester.state<ScaffoldState>(find.byType(Scaffold).first).openDrawer();
+      await tester.pumpAndSettle();
+      expect(find.text('Rider: Ann Other (777)'), findsOneWidget);
+      await unmount(tester);
+    }, MockServer.client);
   });
 }

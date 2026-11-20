@@ -34,8 +34,10 @@ import 'package:ebrevet_card/my_activated_events_page.dart';
 import 'package:ebrevet_card/my_settings.dart';
 import 'package:ebrevet_card/mylogger.dart';
 import 'package:ebrevet_card/outcome.dart';
+import 'package:ebrevet_card/rider_edit_page.dart';
 import 'package:ebrevet_card/scheduled_events.dart';
 import 'package:ebrevet_card/settings_page.dart';
+import 'package:ebrevet_card/settings_tiles.dart';
 import 'package:ebrevet_card/side_menu.dart';
 import 'package:ebrevet_card/signature.dart';
 import 'package:ebrevet_card/snackbarglobal.dart';
@@ -315,12 +317,12 @@ void main() {
       await tester.pumpAndSettle();
       // Open every section so all of its actions are built.
       for (final title in [
-        'Rider Settings',
         'Event Info Source',
         'Preferences',
         'Developer Options',
       ]) {
         await tester.ensureVisible(find.text(title));
+        await tester.pumpAndSettle();
         await tester.tap(find.text(title));
         await tester.pumpAndSettle();
       }
@@ -366,7 +368,7 @@ void main() {
               builder: (context) => Container(
                 color: Theme.of(context).colorScheme.primaryContainer,
                 padding: const EdgeInsets.all(16),
-                child: RequiredAppSettings(collapsed: false, onContinue: () {}),
+                child: RequiredAppSettings(onContinue: () {}),
               ),
             ),
           ),
@@ -380,9 +382,92 @@ void main() {
               matching: find.text('Continue')),
           findsOneWidget);
       expect(isA_<ElevatedButton>(skipOffstage: false), findsNothing);
+      // AC9 (intent 0007): the shared form on the first-run background.
+      final handle = tester.ensureSemantics();
+      await expectLater(tester, meetsGuideline(textContrastGuideline));
+      await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+      handle.dispose();
       await unmount(tester);
     });
   }
+
+  // AC7 (intent 0007): first run uses the shared rider form; Continue saves
+  // and leaves the rider on the event list.
+  testWidgets('first-run Required Settings uses RiderForm and Continue saves',
+      (tester) async {
+    await http.runWithClient(() async {
+      SharedPreferences.setMockInitialValues({});
+      await MySetting.initSharedPreferences();
+      await tester.pumpWidget(app(const ScheduledEventsPage()));
+      await pumpFor(tester, const Duration(seconds: 1));
+      expect(find.text('Required Settings'), findsOneWidget);
+      expect(
+          find.descendant(
+              of: find.byType(RequiredAppSettings),
+              matching: find.byType(RiderForm)),
+          findsOneWidget);
+      expect(find.byType(DialogInputSettingsTile), findsNothing);
+      // No warning on first run (no stored ID).
+      await tester.enterText(find.byType(TextFormField).at(2), '4321');
+      await tester.pump();
+      expect(find.byKey(const Key('rider-id-warning')), findsNothing);
+
+      // Invalid: Continue writes nothing and stays.
+      await tester.tap(find.text('Continue'));
+      await tester.pump();
+      expect(find.text('Please enter something'), findsNWidgets(2));
+      expect(AppSettings.rusaID.value, '');
+      expect(find.byType(RequiredAppSettings), findsOneWidget);
+
+      await tester.enterText(find.byType(TextFormField).at(0), 'Ann');
+      await tester.enterText(find.byType(TextFormField).at(1), 'Rider');
+      await tester.tap(find.text('Continue'));
+      await pumpFor(tester, const Duration(seconds: 1));
+      expect(AppSettings.firstName.value, 'Ann');
+      expect(AppSettings.lastName.value, 'Rider');
+      expect(AppSettings.rusaID.value, '4321');
+      expect(find.byType(RequiredAppSettings), findsNothing);
+      expect(find.byType(LatestEventList), findsOneWidget);
+      await unmount(tester);
+    }, MockServer.client);
+  });
+
+  // AC8 (intent 0007): no rider section or rider tiles in Settings.
+  testWidgets('settings has no Rider Settings section or rider fields',
+      (tester) async {
+    await AppSettings.rusaID.setValue(AppSettings.magicRUSAID);
+    await AppSettings.scheduleEventsSourceID
+        .setValue(ScheduleEventsSourceID.fromURL);
+    await tester.pumpWidget(app(const SettingsPage()));
+    await tester.pumpAndSettle();
+    for (final title in [
+      'Event Info Source',
+      'Preferences',
+      'Developer Options',
+    ]) {
+      await tester.ensureVisible(find.text(title));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(title));
+      await tester.pumpAndSettle();
+    }
+    // Every section is open (its contents are built).
+    for (final t in ['Clear All Settings', AppSettings.eventInfoURL.title]) {
+      expect(find.text(t, skipOffstage: false), findsWidgets, reason: t);
+    }
+    expect(find.text('Rider Settings', skipOffstage: false), findsNothing);
+    expect(find.text('Name and ID', skipOffstage: false), findsNothing);
+    expect(find.byType(RequiredAppSettings, skipOffstage: false), findsNothing);
+    expect(find.byType(RiderForm, skipOffstage: false), findsNothing);
+    for (final t in ['First Name', 'Last Name', 'Rider ID']) {
+      expect(find.text(t, skipOffstage: false), findsNothing, reason: t);
+    }
+    for (final tile in tester.widgetList<DialogInputSettingsTile>(
+        find.byType(DialogInputSettingsTile, skipOffstage: false))) {
+      expect([AppSettings.firstName, AppSettings.lastName, AppSettings.rusaID],
+          isNot(contains(tile.mySetting)));
+    }
+    await unmount(tester);
+  });
 
   // AC5 (intent 0005)
   for (final mode in modes) {

@@ -93,7 +93,6 @@ class _ScheduledEventsPageState extends State<ScheduledEventsPage> {
         child: (AppSettings.areRequiredSettingsSet)
             ? LatestEventList(eventFilter: eventFilter)
             : RequiredAppSettings(
-                collapsed: false,
                 onContinue: () => setState(() {}),
               ),
       ),
