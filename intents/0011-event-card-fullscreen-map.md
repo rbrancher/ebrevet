@@ -28,35 +28,35 @@ route that I can pan and zoom and that shows the control names, so that I can st
 the ride before I start.
 
 ## Acceptance criteria
-- [ ] AC1: New `lib/route_map_page.dart` provides `RouteMapPage`, a full-screen page
+- [x] AC1: New `lib/route_map_page.dart` provides `RouteMapPage`, a full-screen page
       with a Material `AppBar` (event name and distance as the title, with a back button) that shows
       the event's route. It reuses the slice (b) tile constants and attribution, and the
       `RouteOverlay` / shared painter from slices (a) and (b). It does not duplicate them.
       No new dependency is added.
-- [ ] AC2: The page's `FlutterMap` is interactive: drag and pinch/scroll zoom are enabled
+- [x] AC2: The page's `FlutterMap` is interactive: drag and pinch/scroll zoom are enabled
       and rotation is disabled. Its initial camera uses the same fit as the card map, so
       every usable control is inside the initial view. Zoom is limited to the tile server's
       range (min 3 to max 19). A widget test checks the interaction flags, the zoom limits
       and that every control is in the initial view.
-- [ ] AC3: Control names: each usable control has a marker on the page that shows the
+- [x] AC3: Control names: each usable control has a marker on the page that shows the
       control's name. Names are readable and do not make the map unusable. The tap target of
       each marker is at least 48x48 dp. Tapping a marker shows the control's name
       and address (and its open/close times if the control is timed) in a bottom sheet or
       similar. A test checks that every control name is reachable (visible, or shown on tap)
       and that the tap targets pass `androidTapTargetGuideline`.
-- [ ] AC4: Tile provider seam: `RouteMapPage` takes the same optional `TileProvider` and
+- [x] AC4: Tile provider seam: `RouteMapPage` takes the same optional `TileProvider` and
       falls back to the same `RouteMap.tileProviderFactory` as the card map, so
       `flutter test` never makes network requests. The visible "© OpenStreetMap contributors"
       attribution is shown. Tiles are fetched for the visible area only, with no prefetching
       (a `panBuffer` of at most 1 is allowed for panning). A test asserts the fake provider is
       the one used.
-- [ ] AC5: Offline and failure fallback: with a failing provider the route, control markers
+- [x] AC5: Offline and failure fallback: with a failing provider the route, control markers
       and attribution still render on the neutral themed background, with no exception
       thrown. Widget test.
-- [ ] AC6: Non-drawable geometry (fewer than 2 usable points, invalid or identical
+- [x] AC6: Non-drawable geometry (fewer than 2 usable points, invalid or identical
       coordinates): the card shows the slice (a) placeholder as today, and it is not tappable.
       No page is opened, because there is no map to show. Test.
-- [ ] AC7: `EventCard`: tapping the card map pushes `RouteMapPage` for that event. The
+- [x] AC7: `EventCard`: tapping the card map pushes `RouteMapPage` for that event. The
       tappable map has a semantics button label such as "Open full-screen map of the
       route", and its hit area is at least 48 dp (the map is much larger than that).
       The map stays non-interactive inside the card, so list scrolling is unaffected. The
@@ -64,14 +64,14 @@ the ride before I start.
       and (b) card layout tests still pass: one media widget per card, one filled ride
       button, all information present. Widget tests cover tap-to-open, back-to-list, and
       the unchanged past-rides card.
-- [ ] AC8: The page survives rotation and resizing (no overflow) and works in light and dark.
+- [x] AC8: The page survives rotation and resizing (no overflow) and works in light and dark.
       `textContrastGuideline` and `androidTapTargetGuideline` pass for the page and for the
       event list in mock mode, in light and dark, using the fake tile provider. The style
       guardrail baseline stays empty. No test makes a network request.
-- [ ] AC9: Mock mode needs no new pass-through: tile GETs already reach the tile host
+- [x] AC9: Mock mode needs no new pass-through: tile GETs already reach the tile host
       (intent 0010 AC10). A test confirms the page makes no request other than tile GETs
       to that host, and that no check-in report is posted.
-- [ ] AC10: Check-in rules, codes, saved ride state and server reporting are unchanged.
+- [x] AC10: Check-in rules, codes, saved ride state and server reporting are unchanged.
 
 ## Out of scope
 - A "you are here" location marker or any live location on the map. That would need

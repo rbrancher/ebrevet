@@ -316,6 +316,8 @@ void main() {
         expect(layer.tileProvider, isA<FakeTileProvider>());
       }
       expect(providers, isNotEmpty);
+      // AC8 (intent 0011): the card maps are now tap targets too.
+      expect(find.bySemanticsLabel(RouteMap.openFullScreenLabel), findsWidgets);
       await expectLater(tester, meetsGuideline(textContrastGuideline));
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
       handle.dispose();

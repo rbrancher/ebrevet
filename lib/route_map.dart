@@ -49,6 +49,14 @@ class RouteMap extends StatelessWidget {
   /// Closest zoom used to fit a short route; OSM serves up to 19.
   static const double maxFitZoom = 17;
 
+  /// Zoom range the tile server serves; the full-screen map (intent 0011)
+  /// is limited to it.
+  static const double minZoom = 3;
+  static const double maxZoom = 19;
+
+  /// Screen-reader label of the tappable card map (intent 0011).
+  static const String openFullScreenLabel = 'Open full-screen map of the route';
+
   /// The one seam for tiles when no [tileProvider] is passed. Tests may
   /// replace it. Defaults to [defaultTileProvider].
   static TileProvider Function() tileProviderFactory = defaultTileProvider;
@@ -75,7 +83,12 @@ class RouteMap extends StatelessWidget {
   /// Tiles for this map; [tileProviderFactory] is used when null.
   final TileProvider? tileProvider;
 
-  const RouteMap({super.key, required this.controls, this.tileProvider});
+  /// Called when the map is tapped (intent 0011). Ignored when the route is
+  /// not drawable: the placeholder is never tappable.
+  final VoidCallback? onTap;
+
+  const RouteMap(
+      {super.key, required this.controls, this.tileProvider, this.onTap});
 
   /// Screen-reader label; [controlCount] is the event's control count.
   static String semanticsLabel(int controlCount) =>
@@ -91,16 +104,20 @@ class RouteMap extends StatelessWidget {
   }
 
   /// Fits the camera to [geometry]'s padded box (Web Mercator, EPSG:3857,
-  /// flutter_map's default CRS).
-  static CameraFit cameraFitOf(RouteGeometry geometry) => CameraFit.bounds(
+  /// flutter_map's default CRS). [padding] keeps extra screen space free
+  /// around the box, e.g. for marker labels on the full-screen map.
+  static CameraFit cameraFitOf(RouteGeometry geometry,
+          {EdgeInsets padding = EdgeInsets.zero}) =>
+      CameraFit.bounds(
         bounds: boundsOf(geometry),
-        padding: EdgeInsets.zero,
+        padding: padding,
         maxZoom: maxFitZoom,
       );
 
   /// The camera [cameraFitOf] gives for a map of [size].
-  static MapCamera fittedCamera(RouteGeometry geometry, Size size) =>
-      cameraFitOf(geometry)
+  static MapCamera fittedCamera(RouteGeometry geometry, Size size,
+          {EdgeInsets padding = EdgeInsets.zero}) =>
+      cameraFitOf(geometry, padding: padding)
           .fit(MapCamera.initialCamera(MapOptions()).withNonRotatedSize(size));
 
   @override
@@ -109,7 +126,7 @@ class RouteMap extends StatelessWidget {
     // Not drawable: the slice (a) placeholder, and no tile layer.
     if (!geometry.isDrawable) return RouteSketch(controls: controls);
 
-    return Semantics(
+    final map = Semantics(
       container: true,
       image: true,
       label: semanticsLabel(controls.length),
@@ -122,7 +139,42 @@ class RouteMap extends StatelessWidget {
         ),
       ),
     );
+    final onTap = this.onTap;
+    if (onTap == null) return map;
+    // The map itself stays non-interactive; a tap on it opens the page.
+    // Taps do not win over drags, so list scrolling is unaffected.
+    return Semantics(
+      container: true,
+      button: true,
+      label: openFullScreenLabel,
+      onTap: onTap,
+      child: Stack(
+        children: [
+          map,
+          Positioned.fill(
+            child: Material(
+              type: MaterialType.transparency,
+              child: InkWell(onTap: onTap, excludeFromSemantics: true),
+            ),
+          ),
+        ],
+      ),
+    );
   }
+
+  /// The OSM tile layer shared by the card map and the full-screen page:
+  /// only the tiles in view are fetched ([TileLayer.panBuffer] 0, no
+  /// prefetching), and a failed tile stays empty so the background shows
+  /// through.
+  static TileLayer tileLayer(TileProvider provider, {int keepBuffer = 0}) =>
+      TileLayer(
+        urlTemplate: tileUrlTemplate,
+        userAgentPackageName: userAgentPackageName,
+        tileProvider: provider,
+        panBuffer: 0,
+        keepBuffer: keepBuffer,
+        errorImage: null,
+      );
 }
 
 /// The FlutterMap itself. Exists only while the route is drawable, so its
@@ -195,16 +247,8 @@ class _TileMapState extends State<_TileMap> {
         ),
       ),
       children: [
-        TileLayer(
-          urlTemplate: RouteMap.tileUrlTemplate,
-          userAgentPackageName: RouteMap.userAgentPackageName,
-          tileProvider: _tileProvider,
-          // Only the tiles in view: no ring of extra tiles.
-          panBuffer: 0,
-          keepBuffer: 0,
-          // A failed tile stays empty (background shows through).
-          errorImage: null,
-        ),
+        // Only the tiles in view: no ring of extra tiles.
+        RouteMap.tileLayer(_tileProvider),
         RouteOverlay(geometry: geometry),
         const MapAttributionChip(),
       ],
