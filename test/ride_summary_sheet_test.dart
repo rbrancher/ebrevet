@@ -131,8 +131,9 @@ void main() {
     final region = Region(regionID: event.regionID);
     final start = event.startDateTime!.toLocal();
     for (final t in [
-      'Sample Hills',
-      '200 km · ${event.dateTime} ${start.timeZoneName}',
+      'Sample Hills 200K',
+      '${event.dateTime} ${start.timeZoneName}',
+      'Ride details',
       'ACP brevet',
       'Time limit: 1h00 (start to finish)',
       'Start location: Doylestown, PA',
@@ -161,6 +162,85 @@ void main() {
     expect(find.textContaining('Gravel'), findsNothing);
     expect(find.text('No cue sheet'), findsNothing);
     expect(tester.takeException(), isNull);
+    await unmount(tester);
+  });
+
+  // PR 41 review: section titles rank between the headline and the body,
+  // and the controls are a numbered Material 3 list, not cards.
+  testWidgets('section titles and a numbered control list', (tester) async {
+    final handle = tester.ensureSemantics();
+    await setSize(tester, const Size(500, 1400));
+    final event = sample();
+    await tester.pumpWidget(app(SheetHost(event)));
+    await tester.pumpAndSettle();
+    final textTheme = Theme.of(tester.element(surface)).textTheme;
+    double sizeOf(String text) =>
+        tester.widget<Text>(find.text(text)).style!.fontSize!;
+    final headline = sizeOf('Sample Hills 200K');
+    for (final title in ['Ride details', '3 controls']) {
+      expect(sizeOf(title), textTheme.titleMedium!.fontSize);
+      expect(sizeOf(title), lessThan(headline));
+      expect(sizeOf(title), greaterThan(sizeOf('ACP brevet')));
+      // Not below a list item's title: as large, and heavier.
+      final item = tester.widget<Text>(find.text(event.controls.first.name));
+      final style = tester.widget<Text>(find.text(title)).style!;
+      expect(style.fontSize, greaterThanOrEqualTo(item.style!.fontSize!));
+      expect(style.fontWeight!.value,
+          greaterThan((item.style!.fontWeight ?? FontWeight.w400).value));
+      expect(tester.getSemantics(find.text(title)),
+          matchesSemantics(label: title, isHeader: true));
+    }
+    expect(find.byType(Divider), findsNWidgets(2));
+    // One list item per control, numbered from 1 in route order.
+    final rows = find.byType(ControlRow);
+    expect(rows, findsNWidgets(event.controls.length));
+    for (var i = 0; i < event.controls.length; i++) {
+      final row = find.byWidgetPredicate(
+          (w) => w is ControlRow && identical(w.control, event.controls[i]));
+      expect(tester.widget<ControlRow>(row).number, i + 1);
+      final tile = find.descendant(of: row, matching: find.byType(ListTile));
+      expect(tile, findsOneWidget);
+      final leading = tester.widget<ListTile>(tile).leading!;
+      expect(
+          find.descendant(
+              of: find.byWidget(leading), matching: find.text('${i + 1}')),
+          findsOneWidget);
+      expect(tester.getSize(tile).height, greaterThanOrEqualTo(48));
+    }
+    expect(find.byType(Card), findsNothing);
+    handle.dispose();
+    await unmount(tester);
+  });
+
+  // PR 41 review: the card's buttons beside the title and its ride row
+  // below it, when the page supplies them.
+  testWidgets('card actions beside the title and below it', (tester) async {
+    await setSize(tester, const Size(500, 1400));
+    final event = sample();
+    final controller = DraggableScrollableController();
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(app(Scaffold(
+      body: RideSummarySheet(
+        event: event,
+        controller: controller,
+        headerActions: (_) => IconButton(
+            onPressed: () {},
+            tooltip: 'Event Info',
+            icon: const Icon(Icons.info_outline)),
+        rideActions: (_) =>
+            FilledButton(onPressed: () {}, child: const Text('RIDE')),
+      ),
+    )));
+    await tester.pumpAndSettle();
+    final title = tester.getRect(find.text('Sample Hills 200K'));
+    final info = tester.getRect(find.byTooltip('Event Info'));
+    final ride = tester.getRect(find.text('RIDE'));
+    expect(info.left, greaterThan(title.right - 1));
+    expect(info.top, lessThan(title.bottom));
+    expect(ride.top, greaterThan(title.bottom));
+    expect(
+        ride.bottom, lessThan(tester.getRect(find.text('Ride details')).top));
+    expectVisible(tester, find.text('RIDE'));
     await unmount(tester);
   });
 

@@ -50,6 +50,14 @@ class RideSummarySheet extends StatefulWidget {
   /// Called when a control in the list is tapped.
   final ValueChanged<Control>? onControlTap;
 
+  /// The event card's buttons beside its title (event info, check-ins),
+  /// shown beside the sheet's title as on the card.
+  final WidgetBuilder? headerActions;
+
+  /// The event card's ride row (outcome and ride button), shown below the
+  /// title as on the card.
+  final WidgetBuilder? rideActions;
+
   const RideSummarySheet({
     super.key,
     required this.event,
@@ -57,15 +65,20 @@ class RideSummarySheet extends StatefulWidget {
     this.highlighted,
     this.revealRequest = 0,
     this.onControlTap,
+    this.headerActions,
+    this.rideActions,
   });
 
-  /// Height of the collapsed sheet: handle, name, distance and start.
+  /// Height of the collapsed sheet: handle, title (name and distance) and
+  /// start.
   static const double collapsedHeight = 120;
 
   /// The collapsed sheet never takes more of a short body than this.
   static const double maxCollapsedSize = 0.45;
+
+  /// The sheet opens at half height.
   static const double halfSize = 0.5;
-  static const double expandedSize = 0.9;
+  static const double expandedSize = 0.75;
 
   /// Minimum height of the drag handle's tap target, in dp.
   static const double handleTapTarget = 48;
@@ -86,6 +99,9 @@ class RideSummarySheet extends StatefulWidget {
   /// Collapsed height in dp for a body [height].
   static double collapsedExtent(double height) =>
       collapsedSize(height) * height;
+
+  /// Height in dp of the sheet as it opens (half) for a body [height].
+  static double initialExtent(double height) => halfSize * height;
 
   /// The one seam for calling the organizer. Null where launching is not
   /// supported (web) and under `flutter test`, so tests never launch;
@@ -134,7 +150,8 @@ class _RideSummarySheetState extends State<RideSummarySheet> {
   final Map<int, GlobalKey> _rowKeys = {};
   ScrollController? _scroll;
   double _minSize = RideSummarySheet.maxCollapsedSize;
-  bool _collapsed = true;
+  bool _collapsed = false;
+  bool _expanded = false;
 
   DraggableScrollableController get _sheet => widget.controller;
 
@@ -167,7 +184,13 @@ class _RideSummarySheetState extends State<RideSummarySheet> {
 
   void _onExtent() {
     final collapsed = _sheet.size <= _minSize + 0.01;
-    if (collapsed != _collapsed) setState(() => _collapsed = collapsed);
+    final expanded = _sheet.size >= RideSummarySheet.expandedSize - 0.01;
+    if (collapsed != _collapsed || expanded != _expanded) {
+      setState(() {
+        _collapsed = collapsed;
+        _expanded = expanded;
+      });
+    }
   }
 
   /// Expands to at least half and scrolls [c]'s row into view.
@@ -192,11 +215,17 @@ class _RideSummarySheetState extends State<RideSummarySheet> {
         duration: RideSummarySheet.animationDuration, curve: Curves.easeOut);
   }
 
+  /// Steps through the three stops: collapsed, half, expanded, then back
+  /// to collapsed.
   void _toggle() {
     if (!_sheet.isAttached) return;
-    if (_collapsed) {
-      _sheet.animateTo(RideSummarySheet.halfSize,
-          duration: RideSummarySheet.animationDuration, curve: Curves.easeOut);
+    if (!_expanded) {
+      _sheet.animateTo(
+          _collapsed
+              ? RideSummarySheet.halfSize
+              : RideSummarySheet.expandedSize,
+          duration: RideSummarySheet.animationDuration,
+          curve: Curves.easeOut);
     } else {
       final scroll = _scroll;
       if (scroll != null && scroll.hasClients) scroll.jumpTo(0);
@@ -211,7 +240,7 @@ class _RideSummarySheetState extends State<RideSummarySheet> {
           _minSize = RideSummarySheet.collapsedSize(constraints.maxHeight);
           return DraggableScrollableSheet(
             controller: _sheet,
-            initialChildSize: _minSize,
+            initialChildSize: RideSummarySheet.halfSize,
             minChildSize: _minSize,
             maxChildSize: RideSummarySheet.expandedSize,
             snap: true,
@@ -245,8 +274,7 @@ class _RideSummarySheetState extends State<RideSummarySheet> {
           slivers: [
             PinnedHeaderSliver(child: _handle(scheme)),
             SliverPadding(
-              padding: EdgeInsets.fromLTRB(
-                  tokens.spaceMedium, 0, tokens.spaceMedium, tokens.spaceLarge),
+              padding: EdgeInsets.only(bottom: tokens.spaceLarge),
               sliver: SliverToBoxAdapter(child: _content(context)),
             ),
           ],
@@ -256,9 +284,9 @@ class _RideSummarySheetState extends State<RideSummarySheet> {
   }
 
   Widget _handle(ColorScheme scheme) {
-    final label = _collapsed
-        ? RideSummarySheet.expandLabel
-        : RideSummarySheet.collapseLabel;
+    final label = _expanded
+        ? RideSummarySheet.collapseLabel
+        : RideSummarySheet.expandLabel;
     return Material(
       color: scheme.surfaceContainerLow,
       child: Semantics(
@@ -291,7 +319,105 @@ class _RideSummarySheetState extends State<RideSummarySheet> {
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final tokens = AppTokens.of(context);
-    final body = textTheme.bodyMedium?.copyWith(color: scheme.onSurface);
+    final headerActions = widget.headerActions;
+    final rideActions = widget.rideActions;
+
+    // Section titles rank below the headline and above the body text.
+    Widget section(String title) => Padding(
+          padding: EdgeInsets.fromLTRB(tokens.spaceMedium, tokens.spaceSmall,
+              tokens.spaceMedium, tokens.spaceSmall),
+          child: Semantics(
+            header: true,
+            child: Text(title,
+                style:
+                    textTheme.titleMedium?.copyWith(color: scheme.onSurface)),
+          ),
+        );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Headline and subhead as on the event card, with the card's info
+        // and check-ins buttons. Collapsed content: name, distance, start.
+        Padding(
+          padding: EdgeInsets.fromLTRB(tokens.spaceMedium, 0,
+              headerActions == null ? tokens.spaceMedium : 4, 0),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        event.nameDist,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: scheme.onSurface),
+                      ),
+                      Text(
+                        RideSummarySheet.startText(event),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.bodyMedium
+                            ?.copyWith(color: scheme.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (headerActions != null) headerActions(context),
+            ],
+          ),
+        ),
+        // The card's ride row: outcome and ride button.
+        if (rideActions != null) ...[
+          SizedBox(height: tokens.spaceSmall),
+          rideActions(context),
+        ],
+        SizedBox(height: tokens.spaceSmall),
+        const Divider(),
+        section('Ride details'),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: tokens.spaceMedium),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: _details(context),
+          ),
+        ),
+        SizedBox(height: tokens.spaceSmall),
+        const Divider(),
+        section('${event.controls.length} controls'),
+        for (var i = 0; i < event.controls.length; i++)
+          KeyedSubtree(
+            key: _rowKeys.putIfAbsent(event.controls[i].index, GlobalKey.new),
+            child: ControlRow(
+              event: event,
+              control: event.controls[i],
+              number: i + 1,
+              highlighted: identical(event.controls[i], widget.highlighted),
+              onTap: widget.onControlTap == null
+                  ? null
+                  : () => widget.onControlTap!(event.controls[i]),
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// The "Ride details" lines.
+  List<Widget> _details(BuildContext context) {
+    final event = widget.event;
+    final scheme = Theme.of(context).colorScheme;
+    final tokens = AppTokens.of(context);
+    final body = Theme.of(context)
+        .textTheme
+        .bodyMedium
+        ?.copyWith(color: scheme.onSurface);
     final region = Region(regionID: event.regionID);
     final kind = [
       if (RideSummarySheet.isKnown(event.eventSanction)) event.eventSanction,
@@ -310,79 +436,48 @@ class _RideSummarySheetState extends State<RideSummarySheet> {
           child: Text(text, style: body),
         );
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Collapsed content: name, distance and start.
-        Text(event.name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: textTheme.titleMedium?.copyWith(color: scheme.onSurface)),
-        const SizedBox(height: 4),
-        Text(
-          '${event.distance} km · ${RideSummarySheet.startText(event)}',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: tokens.numericSmall.copyWith(color: scheme.onSurfaceVariant),
-        ),
-        SizedBox(height: tokens.spaceMedium),
-        if (kind.isNotEmpty) line(kind),
-        if (limit != null) line('Time limit: $limit (start to finish)'),
-        if (place.isNotEmpty) line('Start location: $place'),
-        line('Club: ${region.clubName}'),
-        line('Region: ${region.regionName}'),
-        if (event.gravelDistance > 0)
-          line('Gravel: ${event.gravelDistance} km'),
-        line(event.cueVersion > 0
-            ? 'Cue version: ${event.cueVersion}'
-            : 'No cue sheet'),
-        if (RideSummarySheet.isKnown(event.organizerName))
-          line('Organizer: ${event.organizerName}'),
-        if (RideSummarySheet.isKnown(phone))
-          launcher == null
-              ? line('Phone: $phone')
-              : Semantics(
-                  link: true,
-                  child: TextButton.icon(
-                    style: TextButton.styleFrom(
-                      minimumSize: const Size(RideSummarySheet.handleTapTarget,
-                          RideSummarySheet.handleTapTarget),
-                      padding:
-                          EdgeInsets.symmetric(horizontal: tokens.spaceSmall),
-                    ),
-                    onPressed: () => launcher(RideSummarySheet.telUri(phone)),
-                    icon: const Icon(Icons.phone),
-                    label: Text(phone),
+    return [
+      if (kind.isNotEmpty) line(kind),
+      if (limit != null) line('Time limit: $limit (start to finish)'),
+      if (place.isNotEmpty) line('Start location: $place'),
+      line('Club: ${region.clubName}'),
+      line('Region: ${region.regionName}'),
+      if (event.gravelDistance > 0) line('Gravel: ${event.gravelDistance} km'),
+      line(event.cueVersion > 0
+          ? 'Cue version: ${event.cueVersion}'
+          : 'No cue sheet'),
+      if (RideSummarySheet.isKnown(event.organizerName))
+        line('Organizer: ${event.organizerName}'),
+      if (RideSummarySheet.isKnown(phone))
+        launcher == null
+            ? line('Phone: $phone')
+            : Semantics(
+                link: true,
+                child: TextButton.icon(
+                  style: TextButton.styleFrom(
+                    minimumSize: const Size(RideSummarySheet.handleTapTarget,
+                        RideSummarySheet.handleTapTarget),
+                    padding:
+                        EdgeInsets.symmetric(horizontal: tokens.spaceSmall),
                   ),
+                  onPressed: () => launcher(RideSummarySheet.telUri(phone)),
+                  icon: const Icon(Icons.phone),
+                  label: Text(phone),
                 ),
-        SizedBox(height: tokens.spaceMedium),
-        Text(
-          '${event.controls.length} controls',
-          style: textTheme.titleSmall?.copyWith(color: scheme.onSurface),
-        ),
-        SizedBox(height: tokens.spaceSmall),
-        for (final c in event.controls)
-          KeyedSubtree(
-            key: _rowKeys.putIfAbsent(c.index, GlobalKey.new),
-            child: ControlRow(
-              event: event,
-              control: c,
-              highlighted: identical(c, widget.highlighted),
-              onTap: widget.onControlTap == null
-                  ? null
-                  : () => widget.onControlTap!(c),
-            ),
-          ),
-      ],
-    );
+              ),
+    ];
   }
 }
 
-/// One control in the summary list: name, distance and (if timed) open and
+/// One control in the summary list, a Material 3 list item: its [number]
+/// in a leading badge, the name, and the distance and (if timed) open and
 /// close times; in full via [ControlDetails] when highlighted.
 class ControlRow extends StatelessWidget {
   final Event event;
   final Control control;
+
+  /// Position in the route, from 1.
+  final int number;
   final bool highlighted;
   final VoidCallback? onTap;
 
@@ -390,9 +485,13 @@ class ControlRow extends StatelessWidget {
     super.key,
     required this.event,
     required this.control,
+    required this.number,
     this.highlighted = false,
     this.onTap,
   });
+
+  /// Side of the leading number badge, in dp.
+  static const double badgeSize = 32;
 
   @override
   Widget build(BuildContext context) {
@@ -405,47 +504,42 @@ class ControlRow extends StatelessWidget {
         ? ' · ${Utility.toBriefDateTimeString(control.open)}'
             ' – ${Utility.toBriefDateTimeString(control.close)}'
         : '';
-    return Semantics(
-      selected: highlighted,
-      child: Material(
-        color: highlighted ? scheme.secondaryContainer : Colors.transparent,
-        borderRadius: BorderRadius.circular(tokens.radius),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(tokens.radius),
-          onTap: onTap,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-                minHeight: RideSummarySheet.handleTapTarget,
-                minWidth: double.infinity),
-            child: Padding(
-              padding: EdgeInsets.symmetric(
-                  horizontal: tokens.spaceSmall, vertical: 4),
-              child: highlighted
-                  ? ControlDetails(
-                      event: event,
-                      control: control,
-                      color: scheme.onSecondaryContainer)
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(control.name,
-                            style: textTheme.bodyLarge
-                                ?.copyWith(color: scheme.onSurface)),
-                        Text('$km$times',
-                            style: tokens.numericSmall
-                                .copyWith(color: scheme.onSurfaceVariant)),
-                      ],
-                    ),
+    final titleColor =
+        highlighted ? scheme.onSecondaryContainer : scheme.onSurface;
+    return Material(
+      color: highlighted ? scheme.secondaryContainer : Colors.transparent,
+      child: ListTile(
+        selected: highlighted,
+        onTap: onTap,
+        leading: DecoratedBox(
+          decoration: BoxDecoration(
+              color: scheme.primaryContainer, shape: BoxShape.circle),
+          child: SizedBox.square(
+            dimension: badgeSize,
+            child: Center(
+              child: Text('$number',
+                  style: textTheme.labelLarge
+                      ?.copyWith(color: scheme.onPrimaryContainer)),
             ),
           ),
         ),
+        title: Text(control.name,
+            style: textTheme.bodyLarge?.copyWith(color: titleColor)),
+        subtitle: highlighted
+            ? ControlDetails(
+                event: event,
+                control: control,
+                color: scheme.onSecondaryContainer)
+            : Text('$km$times',
+                style: tokens.numericSmall
+                    .copyWith(color: scheme.onSurfaceVariant)),
       ),
     );
   }
 }
 
-/// Full name, distance, address and (for a timed control) open and close
-/// times, in [color].
+/// Distance, address and (for a timed control) open and close times, in
+/// [color]; the name is the list item's title.
 class ControlDetails extends StatelessWidget {
   final Event event;
   final Control control;
@@ -469,8 +563,6 @@ class ControlDetails extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(control.name,
-            style: textTheme.titleMedium?.copyWith(color: color)),
         Text('${RideSummarySheet.controlKm(control)} km', style: body),
         if (control.address.isNotEmpty) Text(control.address, style: body),
         if (timed) ...[

@@ -77,6 +77,10 @@ Finder markerTarget(String name) => find.descendant(
 /// The summary sheet's surface; its height is the visible extent.
 Finder get sheetSurface => find.byKey(RideSummarySheet.surfaceKey);
 
+/// The highlighted control in the summary sheet's list.
+Finder get highlightedRow =>
+    find.byWidgetPredicate((w) => w is ControlRow && w.highlighted);
+
 /// Height of the page body (the area the sheet's sizes are fractions of).
 double bodyHeight(WidgetTester tester) =>
     tester.getSize(find.byType(RideSummarySheet)).height;
@@ -84,6 +88,17 @@ double bodyHeight(WidgetTester tester) =>
 /// Visible sheet extent as a fraction of the body.
 double sheetSize(WidgetTester tester) =>
     tester.getSize(sheetSurface).height / bodyHeight(tester);
+
+/// Taps the handle until the sheet is collapsed (it steps collapsed, half,
+/// expanded).
+Future<void> collapseSheet(WidgetTester tester) async {
+  final collapsed = RideSummarySheet.collapsedSize(bodyHeight(tester));
+  for (var i = 0; i < 3 && sheetSize(tester) > collapsed + 0.01; i++) {
+    await tester.tap(find.bySemanticsLabel(RegExp('ride summary')));
+    await tester.pumpAndSettle();
+  }
+  expect(sheetSize(tester), closeTo(collapsed, 0.01));
+}
 
 Future<void> setSize(WidgetTester tester, Size size) async {
   tester.view.physicalSize = size;
@@ -202,11 +217,14 @@ void main() {
         }),
         isEmpty);
 
-    // A drag pans the map.
+    // A drag above the (half-open) summary sheet pans the map.
     await tester.pump();
     final before = cameraOf(tester).center;
-    await tester.timedDragFrom(tester.getCenter(find.byType(FlutterMap)),
-        const Offset(-120, 80), const Duration(milliseconds: 300));
+    final mapRect = tester.getRect(find.byType(FlutterMap));
+    await tester.timedDragFrom(
+        Offset(mapRect.center.dx, mapRect.top + mapRect.height / 4),
+        const Offset(-120, 80),
+        const Duration(milliseconds: 300));
     await tester.pumpAndSettle();
     expect(cameraOf(tester).center, isNot(before));
     expect(cameraOf(tester).rotation, 0);
@@ -228,11 +246,11 @@ void main() {
       final camera = cameraOf(tester);
       final size = tester.getSize(find.byType(FlutterMap));
       // The card's fit (same padded bounds, RouteMap.cameraFitOf), with
-      // room kept for the marker labels and (intent 0013) the collapsed
-      // summary sheet.
+      // room kept for the marker labels and (intent 0013) the summary
+      // sheet, which opens at half height.
       final fitted = RouteMap.fittedCamera(geometry, size,
           padding: RouteMapPage.fitPadding(
-              RideSummarySheet.collapsedExtent(size.height)));
+              RideSummarySheet.initialExtent(size.height)));
       expect(camera.center, fitted.center);
       expect(camera.zoom, closeTo(fitted.zoom, 1e-9));
       for (final p in geometry.latLongs) {
@@ -302,7 +320,8 @@ void main() {
 
     await tester.tap(markerTarget('Start bakery'));
     await tester.pumpAndSettle();
-    var sheet = find.byType(ControlDetails);
+    expect(find.byType(ControlDetails), findsOneWidget);
+    final sheet = highlightedRow;
     expect(sheet, findsOneWidget);
     expect(find.descendant(of: sheet, matching: find.text('Start bakery')),
         findsOneWidget);
@@ -321,7 +340,7 @@ void main() {
     // An untimed (photo) control: name only, no times.
     await tester.tap(markerTarget('Photo of the covered bridge'));
     await tester.pumpAndSettle();
-    sheet = find.byType(ControlDetails);
+    expect(find.byType(ControlDetails), findsOneWidget);
     expect(sheet, findsOneWidget);
     expect(
         find.descendant(
@@ -500,8 +519,9 @@ void main() {
   });
 
   group('ride summary sheet (intent 0013)', () {
-    // AC1 (intent 0013)
-    testWidgets('persistent, collapsed sheet with name, distance and start',
+    // AC1 (intent 0013), refined on PR 41: the sheet opens at half height,
+    // and its title is styled as on the event card.
+    testWidgets('persistent sheet, opens at half, name, distance and start',
         (tester) async {
       final event = events.first;
       await tester.pumpWidget(pageApp(event, provider: FakeTileProvider()));
@@ -518,22 +538,33 @@ void main() {
       final surface = tester.getRect(sheetSurface);
       expect(surface.bottom, body.bottom);
       expect(tester.widget<DraggableScrollableSheet>(sheet).snap, isTrue);
-      // Starts collapsed, with a drag handle.
+      // Opens at half height, with a drag handle.
       expect(surface.height,
-          closeTo(RideSummarySheet.collapsedExtent(body.height), 0.5));
+          closeTo(RideSummarySheet.initialExtent(body.height), 0.5));
       expect(
           find.bySemanticsLabel(RideSummarySheet.expandLabel), findsOneWidget);
-      // Collapsed content is inside the visible part of the sheet.
+      // The title is the card's: name and distance, titleLarge, bold.
+      final title = find.descendant(
+          of: sheetSurface, matching: find.text(event.nameDist));
+      final textTheme = Theme.of(tester.element(title)).textTheme;
+      final style = tester.widget<Text>(title).style!;
+      expect(style.fontSize, textTheme.titleLarge!.fontSize);
+      expect(style.fontWeight, FontWeight.w700);
+      expect(event.nameDist, contains('${event.distance}K'));
+      // Collapsed content is inside the visible part of the collapsed sheet.
+      await collapseSheet(tester);
+      final collapsed = tester.getRect(sheetSurface);
+      expect(collapsed.height,
+          closeTo(RideSummarySheet.collapsedExtent(body.height), 0.5));
       for (final text in [
-        find.descendant(of: sheetSurface, matching: find.text(event.name)),
+        title,
         find.descendant(
             of: sheetSurface,
-            matching: find.text(
-                '${event.distance} km · ${RideSummarySheet.startText(event)}')),
+            matching: find.text(RideSummarySheet.startText(event))),
       ]) {
         expect(text, findsOneWidget);
         final r = tester.getRect(text);
-        expect(surface.intersect(r), r);
+        expect(collapsed.intersect(r), r);
       }
       expect(RideSummarySheet.startText(event), contains(event.dateTime));
       await unmount(tester);
@@ -557,12 +588,17 @@ void main() {
         await tester.pumpAndSettle();
       }
 
+      // Three stops: collapsed, half and three quarters (PR 41).
+      expect(RideSummarySheet.expandedSize, 0.75);
+      expect(sheetSize(tester), closeTo(RideSummarySheet.halfSize, 0.01));
+      // Down near the bottom: snaps to collapsed.
+      await drag(collapsed + 0.06);
       expect(sheetSize(tester), closeTo(collapsed, 0.01));
       // Up to just below half: snaps to half.
       await drag(0.42);
       expect(sheetSize(tester), closeTo(RideSummarySheet.halfSize, 0.01));
       // Up most of the way: snaps to expanded.
-      await drag(0.75);
+      await drag(0.71);
       expect(sheetSize(tester), closeTo(RideSummarySheet.expandedSize, 0.01));
       // Expanded content scrolls, with no overflow.
       final scroll =
@@ -580,15 +616,16 @@ void main() {
       position.jumpTo(0);
       await tester.pump();
       // Down: back to half, then collapsed.
-      await drag(0.62);
+      await drag(0.55);
       expect(sheetSize(tester), closeTo(RideSummarySheet.halfSize, 0.01));
       await drag(collapsed + 0.06);
       expect(sheetSize(tester), closeTo(collapsed, 0.01));
       await unmount(tester);
     });
 
-    // AC3 (intent 0013)
-    testWidgets('tapping the handle toggles the sheet; 48 dp, labelled',
+    // AC3 (intent 0013), refined on PR 41: a tap steps through the three
+    // stops (collapsed, half, expanded) and back to collapsed.
+    testWidgets('tapping the handle steps the sheet; 48 dp, labelled',
         (tester) async {
       final handle = tester.ensureSemantics();
       await tester
@@ -607,10 +644,11 @@ void main() {
       expect(target.width, greaterThanOrEqualTo(48));
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
 
-      // Collapsed to half.
+      // Opens at half; half to expanded.
+      expect(sheetSize(tester), closeTo(RideSummarySheet.halfSize, 0.01));
       await tester.tap(expand);
       await tester.pumpAndSettle();
-      expect(sheetSize(tester), closeTo(RideSummarySheet.halfSize, 0.01));
+      expect(sheetSize(tester), closeTo(RideSummarySheet.expandedSize, 0.01));
       final collapse = find.bySemanticsLabel(RideSummarySheet.collapseLabel);
       expect(collapse, findsOneWidget);
       expect(
@@ -619,29 +657,26 @@ void main() {
               isButton: true,
               hasTapAction: true,
               label: RideSummarySheet.collapseLabel));
-      // Half back to collapsed.
+      // Expanded back to collapsed.
       await tester.tap(collapse);
       await tester.pumpAndSettle();
       expect(sheetSize(tester), closeTo(collapsed, 0.01));
-      // Expanded back to collapsed.
-      await tester.timedDrag(
-          expand, const Offset(0, -400), const Duration(seconds: 1));
+      // Collapsed to half.
+      await tester.tap(find.bySemanticsLabel(RideSummarySheet.expandLabel));
       await tester.pumpAndSettle();
-      expect(sheetSize(tester), closeTo(RideSummarySheet.expandedSize, 0.01));
-      await tester.tap(find.bySemanticsLabel(RideSummarySheet.collapseLabel));
-      await tester.pumpAndSettle();
-      expect(sheetSize(tester), closeTo(collapsed, 0.01));
-      // The semantics tap action toggles too.
+      expect(sheetSize(tester), closeTo(RideSummarySheet.halfSize, 0.01));
+      // The semantics tap action steps too.
       tester.semantics
           .tap(find.semantics.byLabel(RideSummarySheet.expandLabel));
       await tester.pumpAndSettle();
-      expect(sheetSize(tester), closeTo(RideSummarySheet.halfSize, 0.01));
+      expect(sheetSize(tester), closeTo(RideSummarySheet.expandedSize, 0.01));
       handle.dispose();
       await unmount(tester);
     });
 
-    // AC4 (intent 0013)
-    testWidgets('route fitted above the collapsed sheet; map still pans',
+    // AC4 (intent 0013), refined on PR 41: fitted above the sheet as it
+    // opens (half height).
+    testWidgets('route fitted above the opening sheet; map still pans',
         (tester) async {
       for (final size in const [
         Size(800, 600),
@@ -660,7 +695,7 @@ void main() {
               event.controls.map((c) => LatLong(c.lat, c.long)));
           if (!geometry.isDrawable) continue;
           final mapSize = tester.getSize(find.byType(FlutterMap));
-          final inset = RideSummarySheet.collapsedExtent(mapSize.height);
+          final inset = RideSummarySheet.initialExtent(mapSize.height);
           final camera = cameraOf(tester);
           final fitted = RouteMap.fittedCamera(geometry, mapSize,
               padding: RouteMapPage.fitPadding(inset));
@@ -700,8 +735,7 @@ void main() {
           const Offset(80, 60), const Duration(milliseconds: 300));
       await tester.pumpAndSettle();
       expect(cameraOf(tester).center, isNot(before));
-      expect(sheetSize(tester),
-          closeTo(RideSummarySheet.collapsedSize(bodyHeight(tester)), 0.01));
+      expect(sheetSize(tester), closeTo(RideSummarySheet.halfSize, 0.01));
       await unmount(tester);
     });
 
@@ -713,6 +747,9 @@ void main() {
           control(i, 40.0 + i * 0.1, -75.2 + i * 0.1,
               name: 'Stop $i', address: '$i Road'),
       ]);
+      // Tall enough that the twelve markers above the half-open sheet do
+      // not overlap.
+      await setSize(tester, const Size(800, 1400));
       await tester.pumpWidget(pageApp(event, provider: FakeTileProvider()));
       await tester.pump();
       final page = find.byType(RouteMapPage);
@@ -728,8 +765,8 @@ void main() {
       final rows = tester.widgetList<ControlRow>(find.byType(ControlRow));
       expect(rows.where((r) => r.highlighted).map((r) => r.control.name),
           ['Stop 11']);
-      final details = find.byType(ControlDetails);
-      expect(details, findsOneWidget);
+      expect(find.byType(ControlDetails), findsOneWidget);
+      final details = highlightedRow;
       for (final t in [
         'Stop 11',
         '11 Road',
@@ -745,8 +782,7 @@ void main() {
 
       // Collapsed again, another marker moves the highlight; still one
       // sheet.
-      await tester.tap(find.bySemanticsLabel(RideSummarySheet.collapseLabel));
-      await tester.pumpAndSettle();
+      await collapseSheet(tester);
       await tester.tap(markerTarget('Stop 0'));
       await tester.pumpAndSettle();
       expect(
@@ -760,8 +796,7 @@ void main() {
       expect(Navigator.of(tester.element(page)).canPop(), isFalse);
 
       // Collapsed, the same marker again: the sheet expands again.
-      await tester.tap(find.bySemanticsLabel(RideSummarySheet.collapseLabel));
-      await tester.pumpAndSettle();
+      await collapseSheet(tester);
       expect(sheetSize(tester), lessThan(RideSummarySheet.halfSize));
       await tester.tap(markerTarget('Stop 0'));
       await tester.pumpAndSettle();
@@ -812,17 +847,27 @@ void main() {
       final event = withControls(events.first, lineControls());
       await tester.pumpWidget(pageApp(event, provider: FakeTileProvider()));
       await tester.pump();
-      // Collapsed: the attribution chip is above the sheet.
-      final chip = tester.getRect(find.byType(MapAttributionChip).last);
-      final text = tester.getRect(find.text(RouteMap.attribution));
-      expect(text.bottom, lessThanOrEqualTo(tester.getRect(sheetSurface).top));
-      expect(chip.bottom, lessThanOrEqualTo(tester.getRect(sheetSurface).top));
+      // The attribution chip follows the top of the sheet: above it as it
+      // opens, collapsed and expanded.
+      void expectChipAboveSheet() {
+        final top = tester.getRect(sheetSurface).top;
+        final chip = tester.getRect(find.byType(MapAttributionChip).last);
+        final text = tester.getRect(find.text(RouteMap.attribution));
+        expect(text.bottom, lessThanOrEqualTo(top));
+        expect(chip.bottom, lessThanOrEqualTo(top));
+        expect(chip.bottom, greaterThan(top - 40));
+      }
+
+      expectChipAboveSheet();
+      await collapseSheet(tester);
+      expectChipAboveSheet();
 
       await tester.timedDrag(
           find.bySemanticsLabel(RideSummarySheet.expandLabel),
           const Offset(0, -1400),
           const Duration(seconds: 1));
       await tester.pumpAndSettle();
+      expectChipAboveSheet();
       final labels = [
         for (final n in tester.semantics.simulatedAccessibilityTraversal())
           n.label
@@ -835,8 +880,9 @@ void main() {
           labels.indexWhere((l) => l.contains(label), start);
       final order = [
         start,
-        at(event.name),
-        at('${event.distance} km'),
+        at(event.nameDist),
+        at(RideSummarySheet.startText(event)),
+        at('Ride details'),
         at('Club:'),
         at('${event.controls.length} controls'),
         for (final c in event.controls)
@@ -865,10 +911,9 @@ void main() {
         expect(find.byType(RouteSketch), findsOneWidget);
         expect(find.byType(RideSummarySheet), findsOneWidget);
         expect(
-            find.descendant(of: sheetSurface, matching: find.text(event.name)),
+            find.descendant(
+                of: sheetSurface, matching: find.text(event.nameDist)),
             findsOneWidget);
-        await tester.tap(find.bySemanticsLabel(RideSummarySheet.expandLabel));
-        await tester.pumpAndSettle();
         expect(sheetSize(tester), closeTo(RideSummarySheet.halfSize, 0.01));
         final row = find.byType(ControlRow).first;
         await tester.ensureVisible(row);

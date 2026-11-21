@@ -38,7 +38,18 @@ class RouteMapPage extends StatefulWidget {
   /// Tiles for this map; [RouteMap.tileProviderFactory] is used when null.
   final TileProvider? tileProvider;
 
-  const RouteMapPage({super.key, required this.event, this.tileProvider});
+  /// The event card's buttons and ride row, shown in the summary sheet as
+  /// on the card (see [RideSummarySheet.headerActions] and
+  /// [RideSummarySheet.rideActions]).
+  final WidgetBuilder? headerActions;
+  final WidgetBuilder? rideActions;
+
+  const RouteMapPage(
+      {super.key,
+      required this.event,
+      this.tileProvider,
+      this.headerActions,
+      this.rideActions});
 
   /// Pan and zoom (drag, pinch, scroll, double tap, fling); no rotation.
   static const int interactionFlags =
@@ -59,7 +70,7 @@ class RouteMapPage extends StatefulWidget {
   /// sheet is tapped (intent 0013).
   static const double minFocusZoom = 12;
 
-  /// [markerPadding] plus the collapsed summary sheet's height
+  /// [markerPadding] plus the summary sheet's opening height
   /// ([bottomInset]) at the bottom, so the route is fitted to the area
   /// above the sheet (intent 0013).
   static EdgeInsets fitPadding(double bottomInset) =>
@@ -123,8 +134,7 @@ class _RouteMapPageState extends State<RouteMapPage> {
     return Scaffold(
       appBar: AppBar(title: Text(event.nameDist)),
       body: LayoutBuilder(builder: (context, constraints) {
-        final collapsed =
-            RideSummarySheet.collapsedExtent(constraints.maxHeight);
+        final opening = RideSummarySheet.initialExtent(constraints.maxHeight);
         return Stack(
           fit: StackFit.expand,
           children: [
@@ -133,7 +143,8 @@ class _RouteMapPageState extends State<RouteMapPage> {
                 event: event,
                 geometry: _geometry,
                 size: constraints.biggest,
-                bottomInset: collapsed,
+                bottomInset: opening,
+                sheet: _sheet,
                 controller: _map,
                 onMarkerTap: _onMarkerTap,
                 tileProvider: widget.tileProvider,
@@ -142,7 +153,9 @@ class _RouteMapPageState extends State<RouteMapPage> {
               // Not reached from the card (its placeholder is not tappable),
               // but never show an empty map.
               Padding(
-                padding: EdgeInsets.only(bottom: collapsed),
+                padding: EdgeInsets.only(
+                    bottom: RideSummarySheet.collapsedExtent(
+                        constraints.maxHeight)),
                 child: Center(child: RouteSketch(controls: event.controls)),
               ),
             RideSummarySheet(
@@ -151,6 +164,8 @@ class _RouteMapPageState extends State<RouteMapPage> {
               highlighted: _highlighted,
               revealRequest: _revealRequest,
               onControlTap: _onRowTap,
+              headerActions: widget.headerActions,
+              rideActions: widget.rideActions,
             ),
           ],
         );
@@ -164,8 +179,11 @@ class _RouteMapBody extends StatefulWidget {
   final RouteGeometry geometry;
   final Size size;
 
-  /// Height of the collapsed summary sheet over the bottom of the map.
+  /// Height of the summary sheet over the bottom of the map as it opens.
   final double bottomInset;
+
+  /// The summary sheet, followed by the attribution chip.
+  final DraggableScrollableController sheet;
   final MapController controller;
   final ValueChanged<Control> onMarkerTap;
   final TileProvider? tileProvider;
@@ -175,6 +193,7 @@ class _RouteMapBody extends StatefulWidget {
       required this.geometry,
       required this.size,
       required this.bottomInset,
+      required this.sheet,
       required this.controller,
       required this.onMarkerTap,
       this.tileProvider});
@@ -194,7 +213,7 @@ class _RouteMapBodyState extends State<_RouteMapBody> {
     final scheme = Theme.of(context).colorScheme;
     final geometry = widget.geometry;
     // Same fit as the card map (plus room for the labels), in the area
-    // above the collapsed sheet, applied from the first frame.
+    // above the sheet as it opens, applied from the first frame.
     final padding = RouteMapPage.fitPadding(widget.bottomInset);
     final camera =
         RouteMap.fittedCamera(geometry, widget.size, padding: padding);
@@ -235,9 +254,16 @@ class _RouteMapBodyState extends State<_RouteMapBody> {
               ),
           ],
         ),
-        // Kept above the collapsed sheet so it is never hidden.
-        Padding(
-          padding: EdgeInsets.only(bottom: widget.bottomInset),
+        // Follows the top of the sheet so it is never hidden.
+        ListenableBuilder(
+          listenable: widget.sheet,
+          builder: (context, child) => Padding(
+            padding: EdgeInsets.only(
+                bottom: widget.sheet.isAttached
+                    ? widget.sheet.pixels
+                    : widget.bottomInset),
+            child: child,
+          ),
           child: const MapAttributionChip(),
         ),
       ],

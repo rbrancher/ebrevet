@@ -36,6 +36,7 @@ import 'control_state.dart';
 import 'utility.dart';
 import 'checkin_status_page.dart';
 import 'route_map.dart';
+import 'route_geometry.dart';
 import 'route_map_page.dart';
 import 'route_sketch.dart';
 
@@ -94,13 +95,17 @@ class _EventCardState extends State<EventCard> {
     final OverallOutcome overallOutcomeInHistory =
         activatedEvent?.outcomes.overallOutcome ??
             OverallOutcome.dns; // DNS if never activated
-    final String overallOutcomeDescriptionInHistory =
-        overallOutcomeInHistory.description;
     final bool isOutcomeFullyUploaded =
         activatedEvent?.isCurrentOutcomeFullyUploaded ?? false;
 
     final textTheme = Theme.of(context).textTheme;
     final scheme = Theme.of(context).colorScheme;
+
+    // The full-screen map opens from the map and from the rest of the card,
+    // except its own buttons (intent 0013); only when the map is drawn.
+    final opensMap = widget.showRouteMap &&
+        RouteGeometry.fromLatLongs(
+            event.controls.map((c) => LatLong(c.lat, c.long))).isDrawable;
 
     // Material 3 card anatomy (intent 0009): media (route sketch), headline,
     // subhead, supporting text, actions.
@@ -108,181 +113,223 @@ class _EventCardState extends State<EventCard> {
       clipBehavior: Clip.antiAlias,
       // The list grid owns the spacing between cards (intent 0012).
       margin: EdgeInsets.zero,
-      // Overall the Card is a Column
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          widget.showRouteMap
-              ? RouteMap(
-                  key: ValueKey(event.eventID),
-                  controls: event.controls,
-                  // Full-screen map (intent 0011).
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => RouteMapPage(event: event),
-                    ),
-                  ),
-                )
-              : RouteSketch(controls: event.controls),
-          // Headline and subhead, with the info and check-ins buttons
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 4, 0),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          event.nameDist,
-                          style: textTheme.titleLarge
-                              ?.copyWith(fontWeight: FontWeight.w700),
-                        ),
-                        Text(
-                          regionName,
-                          style: textTheme.bodyMedium
-                              ?.copyWith(color: scheme.onSurfaceVariant),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                IconButton(
-                  onPressed: () {
-                    openEventInfoDialog(event);
-                  },
-                  tooltip: 'Event Info',
-                  icon: const Icon(Icons.info_outline),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.checklist_rtl),
-                  tooltip: 'View Check-Ins',
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => CheckinStatusPage(event: widget.event),
+      child: InkWell(
+        onTap: opensMap ? openRouteMap : null,
+        // The map announces the same action (RouteMap.openFullScreenLabel).
+        excludeFromSemantics: true,
+        // Overall the Card is a Column
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            widget.showRouteMap
+                ? RouteMap(
+                    key: ValueKey(event.eventID),
+                    controls: event.controls,
+                    // Full-screen map (intent 0011).
+                    onTap: openRouteMap,
+                  )
+                : RouteSketch(controls: event.controls),
+            // Headline and subhead, with the info and check-ins buttons
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 4, 0),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            event.nameDist,
+                            style: textTheme.titleLarge
+                                ?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                          Text(
+                            regionName,
+                            style: textTheme.bodyMedium
+                                ?.copyWith(color: scheme.onSurfaceVariant),
+                          ),
+                        ],
                       ),
-                    );
-                  },
-                ),
-              ],
+                    ),
+                  ),
+                  headerActions(context),
+                ],
+              ),
             ),
-          ),
-          // Supporting text
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: DefaultTextStyle.merge(
-                style: textTheme.bodyMedium,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('${event.startCity}, ${event.startState}'),
-                    Text(event.startTimeWindow.startStyle.description),
-                    if (event.gravelDistance > 0)
-                      Text(
-                          'Gravel: ${event.gravelDistance}K of ${event.distance}K'
-                          ' (${(100.0 * event.gravelDistance / event.distance).round()}%) unpaved'),
-                    if (event.startTimeWindow.onTime != null &&
-                        !event.isUnderway)
-                      Text(
-                        '${event.dateTime} (${event.eventStatusText})',
-                      ),
-                    if (event.startTimeWindow.onTime != null &&
-                        event.isUnderway)
-                      const Text(
-                        'UNDERWAY!',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
+            // Supporting text
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: DefaultTextStyle.merge(
+                  style: textTheme.bodyMedium,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('${event.startCity}, ${event.startState}'),
+                      Text(event.startTimeWindow.startStyle.description),
+                      if (event.gravelDistance > 0)
+                        Text(
+                            'Gravel: ${event.gravelDistance}K of ${event.distance}K'
+                            ' (${(100.0 * event.gravelDistance / event.distance).round()}%) unpaved'),
+                      if (event.startTimeWindow.onTime != null &&
+                          !event.isUnderway)
+                        Text(
+                          '${event.dateTime} (${event.eventStatusText})',
                         ),
-                      ),
-                    Text('Latest Cue Ver: ${event.cueVersionString}'),
-                  ],
+                      if (event.startTimeWindow.onTime != null &&
+                          event.isUnderway)
+                        const Text(
+                          'UNDERWAY!',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      Text('Latest Cue Ver: ${event.cueVersionString}'),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-          // Below the List tile is a row with the ride button
-          Row(
-            children: [
-              const SizedBox(
-                width: 16,
+            // Below the List tile is a row with the ride button
+            rideRow(context),
+            // And finally in the column is a bunch of optional messages and buttons
+            if (overallOutcomeInHistory != OverallOutcome.dns) ...[
+              Text(activatedEvent?.checkInFractionString ?? ''),
+              Text(
+                activatedEvent?.isFullyUploadedString ?? '',
+                style: TextStyle(
+                    fontWeight: isOutcomeFullyUploaded
+                        ? FontWeight.normal
+                        : FontWeight.bold),
               ),
-              // The outcome takes the free space and wraps in a narrow grid
-              // column instead of overflowing (intent 0012).
-              Expanded(
-                child: Wrap(
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    Text(
-                      overallOutcomeDescriptionInHistory,
-                      style: overallOutcomeInHistory == OverallOutcome.active
-                          ? const TextStyle(
-                              fontWeight: FontWeight.bold,
-                            )
-                          : null,
-                    ),
-                    if (overallOutcomeInHistory == OverallOutcome.finish)
-                      Text(
-                          " ${MyActivatedEvents.getElapsedTimeString(event.eventID)}"),
-                    if (overallOutcomeInHistory == OverallOutcome.active)
-                      IconButton(
-                        onPressed: () {
-                          setState(() {
-                            activatedEvent!.overallOutcome = OverallOutcome.dnf;
-                            // pe can't be null because overallOutcomeInHistory wasn't unknown
-                          });
-                          MyActivatedEvents.save().then((status) {
-                            if (status == false) {
-                              MyLogger.entry('Problem saving.');
-                            }
-                          });
-                          // Current.deactivate();
-                        },
-                        icon: const Icon(Icons.cancel),
-                        tooltip: 'Abandon the event',
-                      ),
-                  ],
-                ),
-              ),
-              rideButton(
-                  context, event, activatedEvent, widget.onEventsUpdated),
-              const SizedBox(width: 8),
             ],
-          ),
-          // And finally in the column is a bunch of optional messages and buttons
-          if (overallOutcomeInHistory != OverallOutcome.dns) ...[
-            Text(activatedEvent?.checkInFractionString ?? ''),
-            Text(
-              activatedEvent?.isFullyUploadedString ?? '',
-              style: TextStyle(
-                  fontWeight: isOutcomeFullyUploaded
-                      ? FontWeight.normal
-                      : FontWeight.bold),
+
+            if (widget.hasDelete == true)
+              IconButton(
+                onPressed: () async {
+                  var deleted =
+                      await confirmDeleteDialog(context, activatedEvent!) ??
+                          false;
+                  if (deleted) controlState.pastEventDeleted();
+                },
+                icon: const Icon(Icons.delete),
+              ),
+            const SizedBox(
+              height: 8,
             ),
           ],
+        ),
+      ),
+    );
+  }
 
-          if (widget.hasDelete == true)
-            IconButton(
-              onPressed: () async {
-                var deleted =
-                    await confirmDeleteDialog(context, activatedEvent!) ??
-                        false;
-                if (deleted) controlState.pastEventDeleted();
-              },
-              icon: const Icon(Icons.delete),
-            ),
-          const SizedBox(
-            height: 8,
+  /// Opens the full-screen map (intent 0011) with the ride summary sheet,
+  /// which shows this card's buttons and ride row (intent 0013).
+  void openRouteMap() => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => RouteMapPage(
+            event: widget.event,
+            headerActions: headerActions,
+            // Rebuilt in the sheet when the ride changes there.
+            rideActions: (_) => StatefulBuilder(builder: (context, setLocal) {
+              context.watch<ControlState>();
+              return rideRow(context, onChanged: () {
+                if (context.mounted) setLocal(() {});
+              });
+            }),
+          ),
+        ),
+      );
+
+  /// The event info and check-ins buttons beside the card's title.
+  Widget headerActions(BuildContext context) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            onPressed: () {
+              openEventInfoDialog(widget.event);
+            },
+            tooltip: 'Event Info',
+            icon: const Icon(Icons.info_outline),
+          ),
+          IconButton(
+            icon: const Icon(Icons.checklist_rtl),
+            tooltip: 'View Check-Ins',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => CheckinStatusPage(event: widget.event),
+                ),
+              );
+            },
           ),
         ],
-      ),
+      );
+
+  /// The outcome and the ride button. [onChanged] is called, besides this
+  /// card's setState, when they change.
+  Widget rideRow(BuildContext context, {VoidCallback? onChanged}) {
+    final event = widget.event;
+    final activatedEvent =
+        MyActivatedEvents.lookupMyActivatedEvent(event.eventID);
+    final OverallOutcome overallOutcomeInHistory =
+        activatedEvent?.outcomes.overallOutcome ??
+            OverallOutcome.dns; // DNS if never activated
+    final String overallOutcomeDescriptionInHistory =
+        overallOutcomeInHistory.description;
+    return Row(
+      children: [
+        const SizedBox(
+          width: 16,
+        ),
+        // The outcome takes the free space and wraps in a narrow grid
+        // column instead of overflowing (intent 0012).
+        Expanded(
+          child: Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(
+                overallOutcomeDescriptionInHistory,
+                style: overallOutcomeInHistory == OverallOutcome.active
+                    ? const TextStyle(
+                        fontWeight: FontWeight.bold,
+                      )
+                    : null,
+              ),
+              if (overallOutcomeInHistory == OverallOutcome.finish)
+                Text(
+                    " ${MyActivatedEvents.getElapsedTimeString(event.eventID)}"),
+              if (overallOutcomeInHistory == OverallOutcome.active)
+                IconButton(
+                  onPressed: () {
+                    setState(() {
+                      activatedEvent!.overallOutcome = OverallOutcome.dnf;
+                      // pe can't be null because overallOutcomeInHistory wasn't unknown
+                    });
+                    onChanged?.call();
+                    MyActivatedEvents.save().then((status) {
+                      if (status == false) {
+                        MyLogger.entry('Problem saving.');
+                      }
+                    });
+                    // Current.deactivate();
+                  },
+                  icon: const Icon(Icons.cancel),
+                  tooltip: 'Abandon the event',
+                ),
+            ],
+          ),
+        ),
+        rideButton(context, event, activatedEvent, widget.onEventsUpdated,
+            onChanged: onChanged),
+        const SizedBox(width: 8),
+      ],
     );
   }
 
@@ -316,7 +363,8 @@ class _EventCardState extends State<EventCard> {
           });
 
   Widget rideButton(BuildContext context, Event event,
-      ActivatedEvent? activatedEvent, VoidCallback? onEventsUpdated) {
+      ActivatedEvent? activatedEvent, VoidCallback? onEventsUpdated,
+      {VoidCallback? onChanged}) {
     var controlState = context
         .read<ControlState>(); // So addActivate can dirty the control card
 
@@ -478,16 +526,19 @@ class _EventCardState extends State<EventCard> {
             // Deliberately not awaited: the card rebuilds when the page pops.
             unawaited(Navigator.of(context)
                 .push(MaterialPageRoute(
-                  builder: (context) => overallOutcomeInHistory !=
-                          OverallOutcome.finish
-                      ? ControlsViewPage(
-                          event: widget.event,
-                          style: ControlsViewStyle.live,
-                        )
-                      : CertificatePage(
-                          activatedEvent!), // will implicitly ride event just activated
-                ))
-                .then((_) => setState(() {})));
+              builder: (context) => overallOutcomeInHistory !=
+                      OverallOutcome.finish
+                  ? ControlsViewPage(
+                      event: widget.event,
+                      style: ControlsViewStyle.live,
+                    )
+                  : CertificatePage(
+                      activatedEvent!), // will implicitly ride event just activated
+            ))
+                .then((_) {
+              setState(() {});
+              onChanged?.call();
+            }));
           } else {
             MyLogger.entry("Not mounted!?");
           }
