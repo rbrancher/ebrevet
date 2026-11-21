@@ -163,6 +163,40 @@ void main() {
     });
   });
 
+  // Maintainer review on PR 38: with more than one card per row, every card
+  // in the row is as tall as the tallest, so rows have no dents. One card
+  // per row keeps its own height.
+  for (final width in [390.0, 744.0, 1280.0]) {
+    testWidgets('cards in a row share the tallest height at $width dp',
+        (tester) async {
+      setSurface(tester, width, 3000);
+      await tester.pumpWidget(fakeGrid(7));
+      expect(tester.takeException(), isNull);
+      final cards = fakeCards.evaluate().map((e) => e.widget as FakeCard);
+      final rects = rectsOf(tester, fakeCards);
+      final rows = rowsOf(rects);
+      final columns = expectedColumns[width]!;
+      if (columns == 1) {
+        expect([for (final r in rects) r.height],
+            [for (final c in cards) c.height]);
+        return;
+      }
+      var i = 0;
+      for (final row in rows) {
+        final tallest = cards
+            .skip(i)
+            .take(row.length)
+            .map((c) => c.height)
+            .reduce((a, b) => a > b ? a : b);
+        for (final r in row) {
+          expect(r.height, moreOrLessEquals(tallest, epsilon: 0.01));
+        }
+        i += row.length;
+      }
+      expect(rows.last.length, 7 % columns);
+    });
+  }
+
   // AC4 (intent 0012)
   for (final width in [1920.0, 3840.0]) {
     testWidgets('centred body capped at maxBodyWidth at $width dp',
@@ -239,17 +273,25 @@ void main() {
       expect(rows.length, (6 / columns).ceil());
       for (final row in rows) {
         expect(row.length, columns);
+        // Maintainer review on PR 38: cards in a row share one height.
+        for (final r in row) {
+          expect(r.height, moreOrLessEquals(row.first.height, epsilon: 0.01));
+        }
       }
-      // Heights differ, so this really is the uneven case.
-      expect(rects.map((r) => r.height).toSet().length, greaterThan(1));
-      // No clipping: each card is as tall as its content column.
+      // Content heights differ, so this really is the uneven case, and no
+      // card clips its content.
+      final contentHeights = <double>{};
       for (final e in cardFinder.evaluate()) {
         final card = find.byWidget(e.widget);
         final content =
             find.descendant(of: card, matching: find.byType(Column)).first;
-        expect(tester.getSize(content).height,
-            lessThanOrEqualTo(tester.getSize(card).height + 0.01));
+        // The content's natural height, before the row stretches it.
+        final natural = (tester.firstRenderObject(content) as RenderBox)
+            .getMinIntrinsicHeight(tester.getSize(card).width);
+        contentHeights.add(natural.roundToDouble());
+        expect(natural, lessThanOrEqualTo(tester.getSize(card).height + 0.01));
       }
+      expect(contentHeights.length, greaterThan(1));
       await unmount(tester);
     });
   }

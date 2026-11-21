@@ -35,8 +35,10 @@ import 'app_tokens.dart';
 /// | large       | 1200 - 1599       | 2, then 3 above 1248 dp           |
 /// | extra-large | 1600 and up       | 3, in a centred [maxBodyWidth]    |
 ///
-/// Cards are laid out in lazy rows of top-aligned, equal-width cards, so
-/// cards may differ in height and off-screen rows are not built.
+/// Cards are laid out in lazy rows of equal-width cards, so off-screen rows
+/// are not built. When a row holds more than one card, every card in it is
+/// stretched to the height of the tallest one, so rows have no dents. No
+/// card has a fixed height: each row is as tall as its tallest content.
 class ResponsiveCardGrid extends StatelessWidget {
   /// No card is wider than this. Chosen so that a phone (under 600 dp)
   /// always gets one column and two columns start at medium widths.
@@ -94,21 +96,25 @@ class ResponsiveCardGrid extends StatelessWidget {
             delegate: SliverChildBuilderDelegate(
               (context, row) {
                 final first = row * columns;
+                final cells = Row(
+                  // Several cards per row: all as tall as the tallest one.
+                  crossAxisAlignment: columns > 1
+                      ? CrossAxisAlignment.stretch
+                      : CrossAxisAlignment.start,
+                  children: [
+                    for (var c = 0; c < columns; c++) ...[
+                      if (c > 0) SizedBox(width: gap),
+                      Expanded(
+                        child: first + c < cards.length
+                            ? cards[first + c]
+                            : const SizedBox.shrink(),
+                      ),
+                    ],
+                  ],
+                );
                 return body(Padding(
                   padding: EdgeInsets.only(top: row == 0 ? 0 : gap),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      for (var c = 0; c < columns; c++) ...[
-                        if (c > 0) SizedBox(width: gap),
-                        Expanded(
-                          child: first + c < cards.length
-                              ? cards[first + c]
-                              : const SizedBox.shrink(),
-                        ),
-                      ],
-                    ],
-                  ),
+                  child: columns > 1 ? IntrinsicHeight(child: cells) : cells,
                 ));
               },
               childCount: rows,
