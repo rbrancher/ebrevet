@@ -16,7 +16,10 @@
 
 // Full-screen, pannable and zoomable map of an event's route with named
 // control markers (intent 0011). Reuses the card map's tiles, attribution
-// and route overlay from route_map.dart.
+// and route overlay from route_map.dart. A collapsible ride summary sheet
+// (intent 0013, ride_summary_sheet.dart) lies over the bottom of the map.
+
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -24,6 +27,7 @@ import 'package:latlong2/latlong.dart';
 
 import 'control.dart';
 import 'event.dart';
+import 'ride_summary_sheet.dart';
 import 'route_geometry.dart';
 import 'route_map.dart';
 import 'route_sketch.dart';
@@ -51,6 +55,16 @@ class RouteMapPage extends StatefulWidget {
   static const EdgeInsets markerPadding = EdgeInsets.symmetric(
       horizontal: markerMaxWidth / 2, vertical: markerTapTarget);
 
+  /// Zoom the map is raised to, at least, when a control in the summary
+  /// sheet is tapped (intent 0013).
+  static const double minFocusZoom = 12;
+
+  /// [markerPadding] plus the collapsed summary sheet's height
+  /// ([bottomInset]) at the bottom, so the route is fitted to the area
+  /// above the sheet (intent 0013).
+  static EdgeInsets fitPadding(double bottomInset) =>
+      markerPadding + EdgeInsets.only(bottom: bottomInset);
+
   /// Controls that can be placed on the map, in control order.
   static List<Control> usableControls(List<Control> controls) => [
         for (final c in controls)
@@ -65,23 +79,82 @@ class _RouteMapPageState extends State<RouteMapPage> {
   late final RouteGeometry _geometry = RouteGeometry.fromLatLongs(
       widget.event.controls.map((c) => LatLong(c.lat, c.long)));
 
+  final MapController _map = MapController();
+  final DraggableScrollableController _sheet = DraggableScrollableController();
+
+  /// The control highlighted in the summary sheet (intent 0013).
+  Control? _highlighted;
+
+  /// Bumped on every marker tap so the sheet expands even when the same
+  /// control is tapped again.
+  int _revealRequest = 0;
+
+  @override
+  void dispose() {
+    _map.dispose();
+    _sheet.dispose();
+    super.dispose();
+  }
+
+  /// A marker tap highlights its control in the sheet, which expands and
+  /// scrolls to it; no modal sheet is pushed.
+  void _onMarkerTap(Control c) => setState(() {
+        _highlighted = c;
+        _revealRequest++;
+      });
+
+  /// A tap on a control in the sheet's list highlights it and centres the
+  /// map on it, in the part of the map above the sheet.
+  void _onRowTap(Control c) {
+    setState(() => _highlighted = c);
+    if (!_geometry.isDrawable ||
+        !RouteGeometry.isUsable(LatLong(c.lat, c.long))) {
+      return;
+    }
+    final sheetHeight = _sheet.isAttached ? _sheet.pixels : 0.0;
+    _map.move(
+        LatLng(c.lat, c.long), max(_map.camera.zoom, RouteMapPage.minFocusZoom),
+        offset: Offset(0, -sheetHeight / 2));
+  }
+
   @override
   Widget build(BuildContext context) {
     final event = widget.event;
     return Scaffold(
       appBar: AppBar(title: Text(event.nameDist)),
-      body: _geometry.isDrawable
-          ? LayoutBuilder(
-              builder: (context, constraints) => _RouteMapBody(
+      body: LayoutBuilder(builder: (context, constraints) {
+        final collapsed =
+            RideSummarySheet.collapsedExtent(constraints.maxHeight);
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            if (_geometry.isDrawable)
+              _RouteMapBody(
                 event: event,
                 geometry: _geometry,
                 size: constraints.biggest,
+                bottomInset: collapsed,
+                controller: _map,
+                onMarkerTap: _onMarkerTap,
                 tileProvider: widget.tileProvider,
+              )
+            else
+              // Not reached from the card (its placeholder is not tappable),
+              // but never show an empty map.
+              Padding(
+                padding: EdgeInsets.only(bottom: collapsed),
+                child: Center(child: RouteSketch(controls: event.controls)),
               ),
-            )
-          // Not reached from the card (its placeholder is not tappable),
-          // but never show an empty map.
-          : Center(child: RouteSketch(controls: event.controls)),
+            RideSummarySheet(
+              event: event,
+              controller: _sheet,
+              highlighted: _highlighted,
+              revealRequest: _revealRequest,
+              onControlTap: _onRowTap,
+            ),
+          ],
+        );
+      }),
     );
   }
 }
@@ -90,12 +163,20 @@ class _RouteMapBody extends StatefulWidget {
   final Event event;
   final RouteGeometry geometry;
   final Size size;
+
+  /// Height of the collapsed summary sheet over the bottom of the map.
+  final double bottomInset;
+  final MapController controller;
+  final ValueChanged<Control> onMarkerTap;
   final TileProvider? tileProvider;
 
   const _RouteMapBody(
       {required this.event,
       required this.geometry,
       required this.size,
+      required this.bottomInset,
+      required this.controller,
+      required this.onMarkerTap,
       this.tileProvider});
 
   @override
@@ -112,13 +193,14 @@ class _RouteMapBodyState extends State<_RouteMapBody> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final geometry = widget.geometry;
-    // Same fit as the card map (plus room for the labels), applied from
-    // the first frame.
-    const padding = RouteMapPage.markerPadding;
+    // Same fit as the card map (plus room for the labels), in the area
+    // above the collapsed sheet, applied from the first frame.
+    final padding = RouteMapPage.fitPadding(widget.bottomInset);
     final camera =
         RouteMap.fittedCamera(geometry, widget.size, padding: padding);
     final controls = RouteMapPage.usableControls(widget.event.controls);
     return FlutterMap(
+      mapController: widget.controller,
       options: MapOptions(
         backgroundColor: scheme.surfaceContainerHighest,
         initialCenter: camera.center,
@@ -148,23 +230,19 @@ class _RouteMapBodyState extends State<_RouteMapBody> {
                     : Alignment.topCenter,
                 child: ControlMarker(
                   control: controls[i],
-                  onTap: () => showControlDetails(context, controls[i]),
+                  onTap: () => widget.onMarkerTap(controls[i]),
                 ),
               ),
           ],
         ),
-        const MapAttributionChip(),
+        // Kept above the collapsed sheet so it is never hidden.
+        Padding(
+          padding: EdgeInsets.only(bottom: widget.bottomInset),
+          child: const MapAttributionChip(),
+        ),
       ],
     );
   }
-
-  Future<void> showControlDetails(BuildContext context, Control control) =>
-      showModalBottomSheet<void>(
-        context: context,
-        showDragHandle: true,
-        builder: (context) =>
-            ControlDetailsSheet(event: widget.event, control: control),
-      );
 }
 
 /// A control's name in a small chip, with a tap target of at least
@@ -216,44 +294,6 @@ class ControlMarker extends StatelessWidget {
               ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Full name, address and (for a timed control) open and close times.
-class ControlDetailsSheet extends StatelessWidget {
-  final Event event;
-  final Control control;
-
-  const ControlDetailsSheet(
-      {super.key, required this.event, required this.control});
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final timed = !event.isUntimedControl(control);
-    return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(control.name, style: textTheme.titleLarge),
-            if (control.address.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(control.address, style: textTheme.bodyMedium),
-            ],
-            if (timed) ...[
-              const SizedBox(height: 8),
-              Text('Open: ${event.openTimeString(control.index)}',
-                  style: textTheme.bodyMedium),
-              Text('Close: ${event.closeTimeString(control.index)}',
-                  style: textTheme.bodyMedium),
-            ],
-          ],
         ),
       ),
     );
