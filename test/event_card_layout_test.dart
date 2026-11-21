@@ -16,6 +16,7 @@ import 'package:ebrevet_card/my_settings.dart';
 import 'package:ebrevet_card/outcome.dart';
 import 'package:ebrevet_card/region.dart';
 import 'package:ebrevet_card/route_map.dart';
+import 'package:ebrevet_card/route_map_page.dart';
 import 'package:ebrevet_card/route_sketch.dart';
 import 'package:ebrevet_card/scheduled_events.dart';
 import 'package:flutter/material.dart';
@@ -326,6 +327,102 @@ void main() {
       await unmount(tester);
     });
 
+    // AC7 (intent 0011)
+    testWidgets('tapping the card map opens the full-screen map; back returns',
+        (tester) async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(app(eventList()));
+      await tester.pump();
+      final button = find.bySemanticsLabel(RouteMap.openFullScreenLabel);
+      expect(button, findsWidgets);
+      final size = tester.getSize(button.first);
+      expect(size.width, greaterThanOrEqualTo(48));
+      expect(size.height, greaterThanOrEqualTo(48));
+      // The card map itself stays non-interactive.
+      final map = find.byType(RouteMap).first;
+      expect(
+          tester
+              .widget<FlutterMap>(
+                  find.descendant(of: map, matching: find.byType(FlutterMap)))
+              .options
+              .interactionOptions
+              .flags,
+          InteractiveFlag.none);
+      final card = find.ancestor(of: map, matching: find.byType(EventCard));
+      final event = tester.widget<EventCard>(card).event;
+
+      await tester.tap(map);
+      await tester.pumpAndSettle();
+      final page = find.byType(RouteMapPage);
+      expect(page, findsOneWidget);
+      expect(tester.widget<RouteMapPage>(page).event, same(event));
+      expect(
+          find.descendant(
+              of: find.byType(AppBar), matching: find.text(event.nameDist)),
+          findsOneWidget);
+
+      await tester.tap(find.byType(BackButton));
+      await tester.pumpAndSettle();
+      expect(find.byType(RouteMapPage), findsNothing);
+      expect(find.byType(LatestEventList), findsOneWidget);
+      expect(find.byType(EventCard), findsWidgets);
+      handle.dispose();
+      await unmount(tester);
+    });
+
+    // AC7 (intent 0011): the list still scrolls when a drag starts on a map.
+    testWidgets('dragging on a card map scrolls the list, opens nothing',
+        (tester) async {
+      await tester.pumpWidget(app(eventList()));
+      await tester.pump();
+      final scrollable = find.byType(Scrollable).first;
+      final before = tester.state<ScrollableState>(scrollable).position.pixels;
+      await tester.drag(find.byType(RouteMap).first, const Offset(0, -200));
+      await tester.pumpAndSettle();
+      expect(tester.state<ScrollableState>(scrollable).position.pixels,
+          greaterThan(before));
+      expect(find.byType(RouteMapPage), findsNothing);
+      await unmount(tester);
+    });
+
+    // AC6 (intent 0011)
+    testWidgets('non-drawable route: placeholder, not tappable, no page',
+        (tester) async {
+      final handle = tester.ensureSemantics();
+      for (final controls in [
+        [control(0, 40.0, -75.2)],
+        [control(0, 0, 0), control(1, 0, 0)],
+        [control(0, double.nan, -75.2), control(1, 40.0, 200)],
+        [control(0, 40.0, -75.2), control(1, 40.0, -75.2)],
+      ]) {
+        final ev = events.first;
+        final saved = [...ev.controls];
+        ev.controls
+          ..clear()
+          ..addAll(controls);
+        try {
+          await tester.pumpWidget(
+              app(Scaffold(body: ListView(children: [EventCard(ev)]))));
+          final media = find.byType(RouteMap);
+          expect(find.descendant(of: media, matching: find.byIcon(Icons.route)),
+              findsOneWidget);
+          expect(find.descendant(of: media, matching: find.byType(InkWell)),
+              findsNothing);
+          expect(find.bySemanticsLabel(RouteMap.openFullScreenLabel),
+              findsNothing);
+          await tester.tap(media, warnIfMissed: false);
+          await tester.pumpAndSettle();
+          expect(find.byType(RouteMapPage), findsNothing);
+        } finally {
+          ev.controls
+            ..clear()
+            ..addAll(saved);
+        }
+      }
+      handle.dispose();
+      await unmount(tester);
+    });
+
     // AC9 (intent 0009)
     testWidgets('My Rides card renders with the shared widget', (tester) async {
       final docs = Directory.systemTemp.createTempSync('ebrevet_test_');
@@ -352,6 +449,16 @@ void main() {
             findsNothing);
         expect(find.byType(FlutterMap), findsNothing);
         expect(find.text('CERTIFICATE'), findsOneWidget);
+        // AC7 (intent 0011): the past-rides card is not tappable.
+        final sketch =
+            find.descendant(of: card, matching: find.byType(RouteSketch));
+        expect(find.descendant(of: sketch, matching: find.byType(InkWell)),
+            findsNothing);
+        expect(
+            find.bySemanticsLabel(RouteMap.openFullScreenLabel), findsNothing);
+        await tester.tap(sketch, warnIfMissed: false);
+        await tester.pumpAndSettle();
+        expect(find.byType(RouteMapPage), findsNothing);
       } finally {
         MyActivatedEvents.deleteMyActivatedEvent(ride);
         await unmount(tester);

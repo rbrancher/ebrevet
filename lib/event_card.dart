@@ -36,6 +36,7 @@ import 'control_state.dart';
 import 'utility.dart';
 import 'checkin_status_page.dart';
 import 'route_map.dart';
+import 'route_map_page.dart';
 import 'route_sketch.dart';
 
 class EventCard extends StatefulWidget {
@@ -110,7 +111,17 @@ class _EventCardState extends State<EventCard> {
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
           widget.showRouteMap
-              ? RouteMap(key: ValueKey(event.eventID), controls: event.controls)
+              ? RouteMap(
+                  key: ValueKey(event.eventID),
+                  controls: event.controls,
+                  // Full-screen map (intent 0011).
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => RouteMapPage(event: event),
+                    ),
+                  ),
+                )
               : RouteSketch(controls: event.controls),
           // Headline and subhead, with the info and check-ins buttons
           Padding(
