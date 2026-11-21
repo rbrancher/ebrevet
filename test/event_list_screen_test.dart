@@ -15,18 +15,23 @@ import 'package:ebrevet_card/event_header_card.dart';
 import 'package:ebrevet_card/event_list_page.dart';
 import 'package:ebrevet_card/mock/mock_server.dart';
 import 'package:ebrevet_card/my_settings.dart';
+import 'package:ebrevet_card/responsive_card_grid.dart';
 import 'package:ebrevet_card/route_map.dart';
+import 'package:ebrevet_card/route_map_page.dart';
 import 'package:ebrevet_card/scheduled_events.dart';
 import 'package:ebrevet_card/snackbarglobal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'support/fake_tiles.dart';
 import 'support/fixtures.dart';
+import 'support/grid.dart';
 
 const startActions = {'RIDE', 'PRE-RIDE'};
 
@@ -291,37 +296,195 @@ void main() {
     });
   });
 
-  // AC7 (intent 0002), AC10 (intent 0009), AC11 (intent 0010): cards now
-  // include the route map, drawn with a fake tile provider.
-  for (final mode in [ThemeMode.light, ThemeMode.dark]) {
-    testWidgets('event list meets contrast and tap-target guidelines ($mode)',
-        (tester) async {
-      final providers = <FakeTileProvider>[];
+  group('responsive grid (intent 0012)', () {
+    late List<FakeTileProvider> providers;
+
+    setUp(() {
+      providers = <FakeTileProvider>[];
       RouteMap.tileProviderFactory = () {
         final p = FakeTileProvider();
         providers.add(p);
         return p;
       };
-      addTearDown(
-          () => RouteMap.tileProviderFactory = RouteMap.defaultTileProvider);
-      final handle = tester.ensureSemantics();
-      await tester.pumpWidget(app(eventList(), mode: mode));
+    });
+
+    tearDown(() => RouteMap.tileProviderFactory = RouteMap.defaultTileProvider);
+
+    final cards = find.byType(EventCard);
+
+    // AC3 (intent 0012): real EventCards per row.
+    for (final width in [390.0, 744.0, 1280.0, 1920.0]) {
+      testWidgets('real cards per row at $width dp', (tester) async {
+        setSurface(tester, width, 3000);
+        await tester.pumpWidget(app(eventList()));
+        await tester.pump();
+        expect(tester.takeException(), isNull);
+        final perRow = cardsPerRow(tester, cards);
+        if (width == 390) expect(perRow, 1);
+        if (width == 744) expect(perRow, 2);
+        if (width == 1280) expect(perRow, 3);
+        if (width == 1920) expect(perRow, greaterThanOrEqualTo(3));
+        await unmount(tester);
+      });
+    }
+
+    // AC4 (intent 0012): real cards never exceed maxCardWidth; centred.
+    for (final width in [1920.0, 3840.0]) {
+      testWidgets('real cards capped and centred at $width dp', (tester) async {
+        setSurface(tester, width, 2000);
+        await tester.pumpWidget(app(eventList()));
+        await tester.pump();
+        final rects = rectsOf(tester, cards);
+        expect(rects, isNotEmpty);
+        for (final r in rects) {
+          expect(r.width, lessThanOrEqualTo(ResponsiveCardGrid.maxCardWidth));
+        }
+        final area = rects.reduce((a, b) => a.expandToInclude(b));
+        expect(area.width, lessThanOrEqualTo(ResponsiveCardGrid.maxBodyWidth));
+        expect(area.left, moreOrLessEquals(width - area.right, epsilon: 0.5));
+        await unmount(tester);
+      });
+    }
+
+    // AC7 (intent 0012): the header is a full-width block above the grid.
+    for (final width in [390.0, 744.0, 1280.0, 1920.0]) {
+      testWidgets('header above every card, as wide as the grid ($width dp)',
+          (tester) async {
+        setSurface(tester, width, 3000);
+        await tester.pumpWidget(app(eventList()));
+        await tester.pump();
+        final header = tester.getRect(find.byKey(ResponsiveCardGrid.headerKey));
+        expect(
+            find.descendant(
+                of: find.byKey(ResponsiveCardGrid.headerKey),
+                matching: find.text('Update event data')),
+            findsOneWidget);
+        final rects = rectsOf(tester, cards);
+        final area = rects.reduce((a, b) => a.expandToInclude(b));
+        for (final r in rects) {
+          expect(header.top, lessThan(r.top));
+          expect(header.bottom, lessThanOrEqualTo(r.top));
+        }
+        expect(header.width, greaterThanOrEqualTo(area.width - 0.01));
+        await unmount(tester);
+      });
+    }
+
+    // AC7 (intent 0012): the button still triggers a refresh. The client
+    // records the request and answers 404, so nothing leaves the test.
+    testWidgets('"Update event data" still requests the event feed',
+        (tester) async {
+      final requested = <Uri>[];
+      await http.runWithClient(() async {
+        setSurface(tester, 1280);
+        await tester.pumpWidget(app(eventList()));
+        await tester.pump();
+        await tester.tap(find.text('Update event data'));
+        await tester.pump();
+        expect(find.textContaining('Updating events for'), findsOneWidget);
+        for (var i = 0; i < 50; i++) {
+          await tester.pump(const Duration(milliseconds: 100));
+        }
+        expect(requested.where((u) => u.path.contains('scheduled_events')),
+            isNotEmpty);
+        await unmount(tester);
+        await tester.pumpAndSettle();
+        await tester.pump(const Duration(seconds: 10));
+      },
+          () => MockClient((request) async {
+                requested.add(request.url);
+                return http.Response('not here', 404);
+              }));
+    });
+
+    // AC10 (intent 0012): intents 0010 and 0011 still hold in the
+    // narrower card.
+    for (final width in [744.0, 1280.0]) {
+      testWidgets('map keeps its aspect ratio at $width dp', (tester) async {
+        setSurface(tester, width, 3000);
+        await tester.pumpWidget(app(eventList()));
+        await tester.pump();
+        final maps = find.byType(RouteMap);
+        expect(maps, findsWidgets);
+        for (final e in maps.evaluate()) {
+          final size = tester.getSize(find.byWidget(e.widget));
+          expect(size.width / size.height,
+              moreOrLessEquals(RouteMap.aspectRatio, epsilon: 0.01));
+        }
+        // Every tile layer uses the fake provider.
+        for (final layer
+            in tester.widgetList<TileLayer>(find.byType(TileLayer))) {
+          expect(layer.tileProvider, isA<FakeTileProvider>());
+        }
+        await unmount(tester);
+      });
+    }
+
+    // AC10 (intent 0012): off-screen cards are built lazily, so their tiles
+    // are never requested.
+    testWidgets('off-screen cards and their tiles are not built',
+        (tester) async {
+      setSurface(tester, 744, 500);
+      await tester.pumpWidget(app(eventList()));
       await tester.pump();
-      expect(find.byType(EventCard), findsWidgets);
-      expect(find.byType(RouteMap), findsWidgets);
-      // Every map uses the fake provider: no network.
-      final layers = tester.widgetList<TileLayer>(find.byType(TileLayer));
-      expect(layers, isNotEmpty);
-      for (final layer in layers) {
-        expect(layer.tileProvider, isA<FakeTileProvider>());
-      }
-      expect(providers, isNotEmpty);
-      // AC8 (intent 0011): the card maps are now tap targets too.
-      expect(find.bySemanticsLabel(RouteMap.openFullScreenLabel), findsWidgets);
-      await expectLater(tester, meetsGuideline(textContrastGuideline));
-      await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
-      handle.dispose();
+      final built = find.byType(RouteMap, skipOffstage: false);
+      final builtCount = built.evaluate().length;
+      expect(builtCount, greaterThan(0));
+      expect(builtCount, lessThan(events.length),
+          reason: 'cards far below the fold should not be built');
+      expect(providers.length, builtCount);
       await unmount(tester);
     });
+
+    // AC10 (intent 0012): tapping a card map opens the full-screen map.
+    testWidgets('tapping a map in the grid opens RouteMapPage', (tester) async {
+      setSurface(tester, 1280);
+      await tester.pumpWidget(app(eventList()));
+      await tester.pump();
+      await tester.tap(find.byType(RouteMap).first);
+      await tester.pumpAndSettle();
+      expect(find.byType(RouteMapPage), findsOneWidget);
+      await unmount(tester);
+    });
+  });
+
+  // AC7 (intent 0002), AC10 (intent 0009), AC11 (intent 0010): cards now
+  // include the route map, drawn with a fake tile provider.
+  // AC11 (intent 0012): at the three grid widths, light and dark.
+  for (final width in [390.0, 744.0, 1280.0]) {
+    for (final mode in [ThemeMode.light, ThemeMode.dark]) {
+      testWidgets(
+          'event list meets contrast and tap-target guidelines '
+          '($mode, $width dp)', (tester) async {
+        setSurface(tester, width);
+        final providers = <FakeTileProvider>[];
+        RouteMap.tileProviderFactory = () {
+          final p = FakeTileProvider();
+          providers.add(p);
+          return p;
+        };
+        addTearDown(
+            () => RouteMap.tileProviderFactory = RouteMap.defaultTileProvider);
+        final handle = tester.ensureSemantics();
+        await tester.pumpWidget(app(eventList(), mode: mode));
+        await tester.pump();
+        expect(find.byType(EventCard), findsWidgets);
+        expect(find.byType(RouteMap), findsWidgets);
+        // Every map uses the fake provider: no network.
+        final layers = tester.widgetList<TileLayer>(find.byType(TileLayer));
+        expect(layers, isNotEmpty);
+        for (final layer in layers) {
+          expect(layer.tileProvider, isA<FakeTileProvider>());
+        }
+        expect(providers, isNotEmpty);
+        // AC8 (intent 0011): the card maps are now tap targets too.
+        expect(
+            find.bySemanticsLabel(RouteMap.openFullScreenLabel), findsWidgets);
+        await expectLater(tester, meetsGuideline(textContrastGuideline));
+        await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+        handle.dispose();
+        await unmount(tester);
+      });
+    }
   }
 }

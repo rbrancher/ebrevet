@@ -21,7 +21,9 @@ import 'dart:async';
 
 import 'snackbarglobal.dart';
 import 'scheduled_events.dart';
+import 'app_tokens.dart';
 import 'event_card.dart';
+import 'responsive_card_grid.dart';
 import 'app_settings.dart';
 import 'day_night.dart';
 // import 'ticker.dart';
@@ -177,16 +179,18 @@ class _LatestEventListState extends State<LatestEventList> {
     var sourceSelection = context.watch<SourceSelection>();
 
     return Stack(children: [
-      ListView(
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: eventListHeader(sourceSelection),
-          ),
-          ...events.map((e) => EventCard(
-                e,
-                onEventsUpdated: refreshPage,
-              )), // All the Event Cards
+      // Responsive grid of cards under a full-width header (intent 0012).
+      ResponsiveCardGrid(
+        header: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: eventListHeader(sourceSelection),
+        ),
+        cards: [
+          for (final e in events)
+            EventCard(
+              e,
+              onEventsUpdated: refreshPage,
+            ), // All the Event Cards
         ],
       ),
       if (fetchingFromServerNow)
@@ -217,11 +221,13 @@ class _LatestEventListState extends State<LatestEventList> {
         : null;
 
     return [
-      Row(
+      // A centred Wrap rather than a Row of spacers, so the header never
+      // overflows a narrow phone or a narrow grid column (intent 0012).
+      Wrap(
+        alignment: WrapAlignment.center,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: AppTokens.of(context).spaceSmall,
         children: [
-          const Spacer(
-            flex: 5,
-          ),
           OutlinedButton.icon(
             onPressed: () {
               AppSnack.show(
@@ -241,7 +247,6 @@ class _LatestEventListState extends State<LatestEventList> {
             icon: const Icon(Icons.refresh),
             label: const Text('Update event data'),
           ),
-          const Spacer(),
           IconButton(
               onPressed: () => Navigator.of(context)
                   .push(MaterialPageRoute(
@@ -249,9 +254,6 @@ class _LatestEventListState extends State<LatestEventList> {
                   ))
                   .then((value) => setState(() {})),
               icon: const Icon(Icons.manage_search)),
-          const Spacer(
-            flex: 5,
-          ),
         ],
       ),
 
