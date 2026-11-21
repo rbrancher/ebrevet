@@ -62,6 +62,8 @@ class _MyActivatedEventsPageState extends State<MyActivatedEventsPage> {
                     ae.event,
                     hasDelete: AppSettings.canDeletePastEvents.value,
                     onDelete: () => setState(() {}),
+                    // Past rides keep the slice (a) sketch (intent 0010).
+                    showRouteMap: false,
                   ),
               ],
             ),

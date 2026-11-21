@@ -35,6 +35,7 @@ import 'mylogger.dart';
 import 'control_state.dart';
 import 'utility.dart';
 import 'checkin_status_page.dart';
+import 'route_map.dart';
 import 'route_sketch.dart';
 
 class EventCard extends StatefulWidget {
@@ -43,8 +44,16 @@ class EventCard extends StatefulWidget {
   final VoidCallback? onDelete;
   final VoidCallback? onEventsUpdated;
 
+  /// Media on top: the tile map (intent 0010) for upcoming events, or the
+  /// locally drawn sketch (intent 0009) when false, as in My Rides.
+  final bool showRouteMap;
+
   const EventCard(this.event,
-      {super.key, this.hasDelete, this.onDelete, this.onEventsUpdated});
+      {super.key,
+      this.hasDelete,
+      this.onDelete,
+      this.onEventsUpdated,
+      this.showRouteMap = true});
 
   @override
   State<EventCard> createState() => _EventCardState();
@@ -100,7 +109,9 @@ class _EventCardState extends State<EventCard> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          RouteSketch(controls: event.controls),
+          widget.showRouteMap
+              ? RouteMap(key: ValueKey(event.eventID), controls: event.controls)
+              : RouteSketch(controls: event.controls),
           // Headline and subhead, with the info and check-ins buttons
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 4, 0),

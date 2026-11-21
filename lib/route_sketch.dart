@@ -17,6 +17,7 @@
 // A small, static drawing of a route's shape through its controls
 // (intent 0009). Drawn locally: no tiles, no network.
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'control.dart';
@@ -55,14 +56,7 @@ class RouteSketch extends StatelessWidget {
             color: scheme.surfaceContainerHighest,
             child: geometry.isDrawable
                 ? CustomPaint(
-                    painter: RouteSketchPainter(
-                      geometry: geometry,
-                      line: scheme.primary,
-                      casing: scheme.surface,
-                      start: scheme.tertiary,
-                      finish: scheme.onSurface,
-                      intermediate: scheme.onSurfaceVariant,
-                    ),
+                    painter: RouteSketchPainter.themed(geometry, scheme),
                     child: const SizedBox.expand(),
                   )
                 : Center(
@@ -75,9 +69,16 @@ class RouteSketch extends StatelessWidget {
   }
 }
 
+/// Draws the route line and markers. Shared by [RouteSketch] (points fitted
+/// into the canvas) and the map overlay in `route_map.dart` (intent 0010),
+/// which passes [screenPoints] already projected by the map camera.
 class RouteSketchPainter extends CustomPainter {
   final RouteGeometry geometry;
   final Color line, casing, start, finish, intermediate;
+
+  /// Screen positions of [RouteGeometry.points], in the same order. When
+  /// null the points are fitted into the canvas with [RouteGeometry.fit].
+  final List<Offset>? screenPoints;
 
   RouteSketchPainter({
     required this.geometry,
@@ -86,7 +87,21 @@ class RouteSketchPainter extends CustomPainter {
     required this.start,
     required this.finish,
     required this.intermediate,
+    this.screenPoints,
   });
+
+  /// The route colors, from the theme's [ColorScheme] only.
+  factory RouteSketchPainter.themed(RouteGeometry geometry, ColorScheme scheme,
+          {List<Offset>? screenPoints}) =>
+      RouteSketchPainter(
+        geometry: geometry,
+        line: scheme.primary,
+        casing: scheme.surface,
+        start: scheme.tertiary,
+        finish: scheme.onSurface,
+        intermediate: scheme.onSurfaceVariant,
+        screenPoints: screenPoints,
+      );
 
   /// Marker kind for each usable point, in control order. A loop gets one
   /// combined start/finish marker on the first point and none on the last,
@@ -104,9 +119,11 @@ class RouteSketchPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final pts = [
-      for (final p in geometry.fit(size.width, size.height)) Offset(p.x, p.y)
-    ];
+    final pts = screenPoints ??
+        [
+          for (final p in geometry.fit(size.width, size.height))
+            Offset(p.x, p.y)
+        ];
     if (pts.length < 2) return;
 
     final path = Path()..moveTo(pts.first.dx, pts.first.dy);
@@ -161,6 +178,7 @@ class RouteSketchPainter extends CustomPainter {
   @override
   bool shouldRepaint(RouteSketchPainter oldDelegate) =>
       oldDelegate.geometry != geometry ||
+      !listEquals(oldDelegate.screenPoints, screenPoints) ||
       oldDelegate.line != line ||
       oldDelegate.casing != casing ||
       oldDelegate.start != start ||

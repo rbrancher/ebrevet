@@ -126,6 +126,24 @@ class RouteGeometry {
     return math.Point(x, -y);
   }
 
+  /// Inverse of [project]: Web Mercator metres (y south) back to degrees.
+  static LatLong unproject(math.Point<double> p) {
+    final long = p.x / earthRadius * 180 / math.pi;
+    final lat = (2 * math.atan(math.exp(-p.y / earthRadius)) - math.pi / 2) *
+        180 /
+        math.pi;
+    return LatLong(lat, long);
+  }
+
+  /// South-west corner of [paddedBounds] in degrees, for fitting a Web
+  /// Mercator map camera to the same box (intent 0010).
+  LatLong get paddedSouthWest =>
+      unproject(math.Point(paddedBounds.minX, paddedBounds.maxY));
+
+  /// North-east corner of [paddedBounds] in degrees.
+  LatLong get paddedNorthEast =>
+      unproject(math.Point(paddedBounds.maxX, paddedBounds.minY));
+
   /// At least two usable points with a non-zero extent.
   bool get isDrawable =>
       points.length >= 2 && (paddedBounds.width > 0 || paddedBounds.height > 0);

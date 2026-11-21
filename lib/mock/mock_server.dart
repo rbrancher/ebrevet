@@ -15,6 +15,7 @@ import '../event.dart';
 import '../files.dart';
 import '../outcome.dart';
 import '../region.dart';
+import '../route_map.dart';
 import '../scheduled_events.dart';
 
 class MockServer {
@@ -37,7 +38,8 @@ class MockServer {
   static DateTime Function() now = DateTime.now;
 
   /// Real client for same-origin requests (e.g. package_info_plus fetching
-  /// version.json on web). Must be created outside http.runWithClient.
+  /// version.json on web) and map tile GETs. Must be created outside
+  /// http.runWithClient.
   static http.Client? passthrough;
 
   static http.Client client() => MockClient(handle);
@@ -47,9 +49,15 @@ class MockServer {
       Uri.base.scheme.startsWith('http') &&
       url.origin == Uri.base.origin;
 
+  /// Read-only map tile requests (intent 0010): GET to the host of
+  /// [RouteMap.tileUrlTemplate] only.
+  static bool _isTileGet(http.Request request) =>
+      request.method == 'GET' && request.url.host == RouteMap.tileHost;
+
   static Future<http.Response> handle(http.Request request) async {
     final path = request.url.pathSegments;
-    if (passthrough != null && _isSameOrigin(request.url)) {
+    if (passthrough != null &&
+        (_isSameOrigin(request.url) || _isTileGet(request))) {
       // The handler's request is already finalized; send a fresh copy.
       final copy = http.Request(request.method, request.url)
         ..headers.addAll(request.headers)

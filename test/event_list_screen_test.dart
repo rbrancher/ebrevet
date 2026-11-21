@@ -15,14 +15,17 @@ import 'package:ebrevet_card/event_header_card.dart';
 import 'package:ebrevet_card/event_list_page.dart';
 import 'package:ebrevet_card/mock/mock_server.dart';
 import 'package:ebrevet_card/my_settings.dart';
+import 'package:ebrevet_card/route_map.dart';
 import 'package:ebrevet_card/scheduled_events.dart';
 import 'package:ebrevet_card/snackbarglobal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'support/fake_tiles.dart';
 import 'support/fixtures.dart';
 
 const startActions = {'RIDE', 'PRE-RIDE'};
@@ -241,23 +244,78 @@ void main() {
     await unmount(tester);
   });
 
-  // AC10 (intent 0009): slice (a) draws the sketch locally and adds no
-  // dependency; the map package arrives in slice (b).
-  test('no map dependency in pubspec.yaml', () {
+  // AC1 (intent 0010), superseding AC10 (intent 0009): flutter_map is the
+  // one new dependency (latlong2 is its own coordinate type, at the range
+  // flutter_map requires). No tile-cache package, SDK constraint unchanged.
+  test('flutter_map dependency, no disk tile cache, same SDK constraint', () {
     final pubspec = File('pubspec.yaml').readAsStringSync();
-    expect(pubspec, isNot(contains('flutter_map')));
-    expect(pubspec, isNot(contains('latlong2')));
+    expect(
+        pubspec, contains(RegExp(r'^  flutter_map: \^8\.', multiLine: true)));
+    expect(
+        pubspec,
+        contains(
+            RegExp(r'^  latlong2: ">=0\.9\.1 <0\.11\.0"', multiLine: true)));
+    expect(pubspec, contains("sdk: '>=2.18.6 <3.0.0'"));
+    // Direct dependencies: the ones before this intent plus the map pair.
+    // Anything else (e.g. a tile-cache package) fails here.
+    final start = pubspec.indexOf('\ndependencies:') + 1;
+    // Up to the next top-level key.
+    final end =
+        pubspec.indexOf(RegExp(r'^[a-z_]+:', multiLine: true), start + 1);
+    final section = pubspec.substring(start, end);
+    final names = RegExp(r'^  ([a-z0-9_]+):', multiLine: true)
+        .allMatches(section)
+        .map((m) => m.group(1))
+        .toSet();
+    expect(names, {
+      'flutter',
+      'shared_preferences',
+      'http',
+      'provider',
+      'geolocator',
+      'crypto',
+      'flutter_launcher_icons',
+      'path_provider',
+      'url_launcher',
+      'package_info_plus',
+      'adaptive_theme',
+      'screenshot',
+      'share_plus',
+      'upgrader',
+      'win32',
+      'confetti',
+      'shimmer',
+      'cupertino_icons',
+      'flutter_map',
+      'latlong2',
+    });
   });
 
-  // AC7 (intent 0002), AC10 (intent 0009): cards now include the route
-  // sketch.
+  // AC7 (intent 0002), AC10 (intent 0009), AC11 (intent 0010): cards now
+  // include the route map, drawn with a fake tile provider.
   for (final mode in [ThemeMode.light, ThemeMode.dark]) {
     testWidgets('event list meets contrast and tap-target guidelines ($mode)',
         (tester) async {
+      final providers = <FakeTileProvider>[];
+      RouteMap.tileProviderFactory = () {
+        final p = FakeTileProvider();
+        providers.add(p);
+        return p;
+      };
+      addTearDown(
+          () => RouteMap.tileProviderFactory = RouteMap.defaultTileProvider);
       final handle = tester.ensureSemantics();
       await tester.pumpWidget(app(eventList(), mode: mode));
       await tester.pump();
       expect(find.byType(EventCard), findsWidgets);
+      expect(find.byType(RouteMap), findsWidgets);
+      // Every map uses the fake provider: no network.
+      final layers = tester.widgetList<TileLayer>(find.byType(TileLayer));
+      expect(layers, isNotEmpty);
+      for (final layer in layers) {
+        expect(layer.tileProvider, isA<FakeTileProvider>());
+      }
+      expect(providers, isNotEmpty);
       await expectLater(tester, meetsGuideline(textContrastGuideline));
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
       handle.dispose();
