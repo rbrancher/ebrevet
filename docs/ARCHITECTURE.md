@@ -43,14 +43,15 @@ finish → EventOutcomes (outcome.dart) → certificate (cert_page.dart) with fi
 | Ride state | `activated_event.dart`, `my_activated_events.dart`, `outcome.dart`, `control_state.dart` |
 | Check-in rules and codes | `checkin.dart`, `signature.dart` (start, check-in, report and finish codes), `location.dart` |
 | Server reporting | `report.dart` (POST check-ins, fetch other riders' status) |
-| UI: event list | `event_list_page.dart`, `event_card.dart`, `event_header_card.dart`, `my_activated_events_page.dart` |
+| UI: event list | `event_list_page.dart`, `event_card.dart`, `event_header_card.dart`, `my_activated_events_page.dart`, `route_geometry.dart`, `route_sketch.dart`, `route_map.dart` (OSM tile map, `flutter_map`) |
 | UI: riding | `controls_view_page.dart`, `control_card.dart`, `checkin_progress.dart`, `map_icon_button.dart`, `time_till.dart` |
 | UI: status and certs | `checkin_status_*.dart`, `cert_page.dart`, `confetti_dialog.dart`, `screen_shot.dart` |
 | Infrastructure | `files.dart`, `mylogger.dart`, `log_page.dart`, `snackbarglobal.dart` (Flushbar), `exception.dart`, `utility.dart`, `side_menu.dart` |
 | Mock mode | `mock/mock_mode.dart` (`kMockMode`), `mock/mock_server.dart` (fake feed, regions and check-in endpoint), `mock/mock_location.dart` (fake GPS) |
 
 ## Seams for testing and mock mode
-- **Network:** every call uses top-level `package:http` functions, and `http.runWithClient` swaps the client. `MockServer.handle` routes `region_list`, `scheduled_events` and POST check-ins. Same-origin requests, such as `version.json` on web, pass through.
+- **Network:** every call uses top-level `package:http` functions, and `http.runWithClient` swaps the client. `MockServer.handle` routes `region_list`, `scheduled_events` and POST check-ins. Same-origin requests, such as `version.json` on web, pass through, as do GETs to the map tile host (`RouteMap.tileHost`).
+- **Map tiles:** `RouteMap` takes an optional `TileProvider`, else `RouteMap.tileProviderFactory`. Under `flutter test` the default is `NoTileProvider`, which makes no requests.
 - **Location:** `RiderLocation.updateLocation` and `checkLocationPermissions` short-circuit to `MockLocation` when `kMockMode` is set.
 - **Clock:** `MockServer.now` can be overridden. App code calls `DateTime.now()` directly, so tests for time-dependent rules should build events relative to a fixed time.
 - **Fixture:** `assets/mock/future_events.json`, a legacy feed. `MockServer.shiftEvent` re-dates it and fills in missing fields.

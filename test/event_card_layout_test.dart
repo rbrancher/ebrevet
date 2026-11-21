@@ -15,9 +15,11 @@ import 'package:ebrevet_card/my_activated_events_page.dart';
 import 'package:ebrevet_card/my_settings.dart';
 import 'package:ebrevet_card/outcome.dart';
 import 'package:ebrevet_card/region.dart';
+import 'package:ebrevet_card/route_map.dart';
 import 'package:ebrevet_card/route_sketch.dart';
 import 'package:ebrevet_card/scheduled_events.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -215,8 +217,9 @@ void main() {
   });
 
   group('EventCard', () {
-    // AC5 (intent 0009)
-    testWidgets('each card in the event list has one sketch, at the top',
+    // AC5 (intent 0009), updated by AC8 (intent 0010): upcoming cards now
+    // show the route map in place of the sketch, still one media widget.
+    testWidgets('each card in the event list has one route map, at the top',
         (tester) async {
       await tester.pumpWidget(app(eventList()));
       await tester.pump();
@@ -224,13 +227,17 @@ void main() {
       expect(cards, findsWidgets);
       for (final card in cards.evaluate()) {
         final cardFinder = find.byWidget(card.widget, skipOffstage: false);
-        final sketch = find.descendant(
+        Finder inCard(Type t) => find.descendant(
             of: cardFinder,
-            matching: find.byType(RouteSketch, skipOffstage: false),
+            matching: find.byType(t, skipOffstage: false),
             skipOffstage: false);
+        final sketch = inCard(RouteMap);
         expect(sketch, findsOneWidget);
+        // One media widget: the map, not a sketch as well.
+        expect(inCard(RouteSketch), findsNothing);
+        expect(inCard(FlutterMap), findsOneWidget);
         final ev = (card.widget as EventCard).event;
-        expect(tester.widget<RouteSketch>(sketch).controls, ev.controls);
+        expect(tester.widget<RouteMap>(sketch).controls, ev.controls);
         final title = find.descendant(
             of: cardFinder,
             matching: find.text(ev.nameDist, skipOffstage: false),
@@ -263,6 +270,7 @@ void main() {
       await unmount(tester);
     });
 
+    // AC8 (intent 0010): still holds with the route map as the media.
     // AC7 + AC8 (intent 0009): every item is still on the card. Distance and
     // gravel stay as full text (no chips), so screen readers get all of it.
     testWidgets('card keeps every item it showed before', (tester) async {
@@ -339,6 +347,10 @@ void main() {
             findsOneWidget);
         expect(find.descendant(of: card, matching: find.byType(RouteSketch)),
             findsOneWidget);
+        // AC8 (intent 0010): past rides keep the slice (a) sketch, no map.
+        expect(find.descendant(of: card, matching: find.byType(RouteMap)),
+            findsNothing);
+        expect(find.byType(FlutterMap), findsNothing);
         expect(find.text('CERTIFICATE'), findsOneWidget);
       } finally {
         MyActivatedEvents.deleteMyActivatedEvent(ride);
