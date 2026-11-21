@@ -26,6 +26,7 @@ import 'day_night.dart';
 import 'mylogger.dart';
 import 'cert_page.dart';
 import 'event_card.dart';
+import 'responsive_card_grid.dart';
 
 class MyActivatedEventsPage extends StatefulWidget {
   const MyActivatedEventsPage({super.key});
@@ -53,20 +54,18 @@ class _MyActivatedEventsPageState extends State<MyActivatedEventsPage> {
         body: Container(
           color: Theme.of(context).colorScheme.primaryContainer,
           padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 16.0),
-          child: Center(
-            child: ListView(
-              // mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                for (var ae in MyActivatedEvents.myActivatedEventsList)
-                  EventCard(
-                    ae.event,
-                    hasDelete: AppSettings.canDeletePastEvents.value,
-                    onDelete: () => setState(() {}),
-                    // Past rides keep the slice (a) sketch (intent 0010).
-                    showRouteMap: false,
-                  ),
-              ],
-            ),
+          // Same responsive grid as the event list (intent 0012).
+          child: ResponsiveCardGrid(
+            cards: [
+              for (var ae in MyActivatedEvents.myActivatedEventsList)
+                EventCard(
+                  ae.event,
+                  hasDelete: AppSettings.canDeletePastEvents.value,
+                  onDelete: () => setState(() {}),
+                  // Past rides keep the slice (a) sketch (intent 0010).
+                  showRouteMap: false,
+                ),
+            ],
           ),
         ));
   }

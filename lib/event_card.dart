@@ -106,6 +106,8 @@ class _EventCardState extends State<EventCard> {
     // subhead, supporting text, actions.
     return Card(
       clipBehavior: Clip.antiAlias,
+      // The list grid owns the spacing between cards (intent 0012).
+      margin: EdgeInsets.zero,
       // Overall the Card is a Column
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -212,35 +214,43 @@ class _EventCardState extends State<EventCard> {
               const SizedBox(
                 width: 16,
               ),
-              Text(
-                overallOutcomeDescriptionInHistory,
-                style: overallOutcomeInHistory == OverallOutcome.active
-                    ? const TextStyle(
-                        fontWeight: FontWeight.bold,
-                      )
-                    : null,
-              ),
-              if (overallOutcomeInHistory == OverallOutcome.finish)
-                Text(
-                    " ${MyActivatedEvents.getElapsedTimeString(event.eventID)}"),
-              if (overallOutcomeInHistory == OverallOutcome.active)
-                IconButton(
-                  onPressed: () {
-                    setState(() {
-                      activatedEvent!.overallOutcome = OverallOutcome.dnf;
-                      // pe can't be null because overallOutcomeInHistory wasn't unknown
-                    });
-                    MyActivatedEvents.save().then((status) {
-                      if (status == false) {
-                        MyLogger.entry('Problem saving.');
-                      }
-                    });
-                    // Current.deactivate();
-                  },
-                  icon: const Icon(Icons.cancel),
-                  tooltip: 'Abandon the event',
+              // The outcome takes the free space and wraps in a narrow grid
+              // column instead of overflowing (intent 0012).
+              Expanded(
+                child: Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      overallOutcomeDescriptionInHistory,
+                      style: overallOutcomeInHistory == OverallOutcome.active
+                          ? const TextStyle(
+                              fontWeight: FontWeight.bold,
+                            )
+                          : null,
+                    ),
+                    if (overallOutcomeInHistory == OverallOutcome.finish)
+                      Text(
+                          " ${MyActivatedEvents.getElapsedTimeString(event.eventID)}"),
+                    if (overallOutcomeInHistory == OverallOutcome.active)
+                      IconButton(
+                        onPressed: () {
+                          setState(() {
+                            activatedEvent!.overallOutcome = OverallOutcome.dnf;
+                            // pe can't be null because overallOutcomeInHistory wasn't unknown
+                          });
+                          MyActivatedEvents.save().then((status) {
+                            if (status == false) {
+                              MyLogger.entry('Problem saving.');
+                            }
+                          });
+                          // Current.deactivate();
+                        },
+                        icon: const Icon(Icons.cancel),
+                        tooltip: 'Abandon the event',
+                      ),
+                  ],
                 ),
-              const Spacer(),
+              ),
               rideButton(
                   context, event, activatedEvent, widget.onEventsUpdated),
               const SizedBox(width: 8),
