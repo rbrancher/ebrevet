@@ -15,6 +15,7 @@ import 'package:ebrevet_card/my_activated_events_page.dart';
 import 'package:ebrevet_card/my_settings.dart';
 import 'package:ebrevet_card/outcome.dart';
 import 'package:ebrevet_card/region.dart';
+import 'package:ebrevet_card/ride_summary_sheet.dart';
 import 'package:ebrevet_card/route_map.dart';
 import 'package:ebrevet_card/route_map_page.dart';
 import 'package:ebrevet_card/route_sketch.dart';
@@ -367,6 +368,102 @@ void main() {
       expect(find.byType(LatestEventList), findsOneWidget);
       expect(find.byType(EventCard), findsWidgets);
       handle.dispose();
+      await unmount(tester);
+    });
+
+    // PR 41 review (intent 0013): the rest of the card opens the map too,
+    // except its own buttons, which keep their actions.
+    testWidgets('tapping the card body opens the map; its buttons do not',
+        (tester) async {
+      await tester.pumpWidget(app(eventList()));
+      await tester.pump();
+      final card = find.byType(EventCard).first;
+      final event = tester.widget<EventCard>(card).event;
+      Finder inCard(Finder f) => find.descendant(of: card, matching: f);
+
+      // Headline and supporting text open the map page for this event.
+      for (final text in [
+        find.text(event.nameDist),
+        find.text('${event.startCity}, ${event.startState}'),
+      ]) {
+        await tester.tap(inCard(text));
+        await tester.pumpAndSettle();
+        final page = find.byType(RouteMapPage);
+        expect(page, findsOneWidget);
+        expect(tester.widget<RouteMapPage>(page).event, same(event));
+        await tester.tap(find.byType(BackButton));
+        await tester.pumpAndSettle();
+      }
+
+      // The info button opens its dialog, not the map.
+      await tester.tap(inCard(find.byIcon(Icons.info_outline)));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(find.byType(RouteMapPage), findsNothing);
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+
+      // The ride button keeps its own action (no rider ID: a message).
+      final ride = inCard(find.byWidgetPredicate((w) => w is FilledButton));
+      if (ride.evaluate().isNotEmpty) {
+        await tester.ensureVisible(ride);
+        await tester.pumpAndSettle();
+        await tester.tap(ride);
+        await tester.pumpAndSettle();
+        expect(find.byType(RouteMapPage), findsNothing);
+      }
+
+      // The tap is not a second semantics action beside the map's.
+      final handle = tester.ensureSemantics();
+      await tester.pump();
+      expect(
+          find.descendant(
+              of: card,
+              matching: find.bySemanticsLabel(RouteMap.openFullScreenLabel)),
+          findsOneWidget);
+      handle.dispose();
+      await unmount(tester);
+    });
+
+    // PR 41 review (intent 0013): the map's summary sheet has the card's
+    // event info and check-ins buttons and its outcome and ride button.
+    testWidgets('the map sheet shows the card buttons and ride row',
+        (tester) async {
+      await tester.pumpWidget(app(eventList()));
+      await tester.pump();
+      final card = find.byType(EventCard).first;
+      final event = tester.widget<EventCard>(card).event;
+      final rideLabels = [
+        for (final b in tester.widgetList<FilledButton>(find.descendant(
+            of: card,
+            matching: find.byWidgetPredicate((w) => w is FilledButton))))
+          labelOf(b)
+      ];
+      await tester
+          .tap(find.descendant(of: card, matching: find.byType(RouteMap)));
+      await tester.pumpAndSettle();
+      final sheet = find.byType(RideSummarySheet);
+      Finder inSheet(Finder f) => find.descendant(of: sheet, matching: f);
+      expect(inSheet(find.byIcon(Icons.info_outline)), findsOneWidget);
+      expect(inSheet(find.byIcon(Icons.checklist_rtl)), findsOneWidget);
+      expect(
+          inSheet(find.text(OverallOutcome.dns.description)), findsOneWidget);
+      expect([
+        for (final b in tester.widgetList<FilledButton>(
+            inSheet(find.byWidgetPredicate((w) => w is FilledButton))))
+          labelOf(b)
+      ], rideLabels);
+      // They work from the sheet: the info dialog opens over the map.
+      await tester.tap(inSheet(find.byIcon(Icons.info_outline)));
+      await tester.pumpAndSettle();
+      expect(
+          find.descendant(
+              of: find.byType(AlertDialog),
+              matching: find.text(event.nameDist)),
+          findsOneWidget);
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+      expect(find.byType(RouteMapPage), findsOneWidget);
       await unmount(tester);
     });
 
