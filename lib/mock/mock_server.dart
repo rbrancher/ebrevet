@@ -15,7 +15,10 @@ import '../event.dart';
 import '../files.dart';
 import '../outcome.dart';
 import '../region.dart';
+import '../route_geometry.dart';
 import '../route_map.dart';
+import '../route_polyline.dart';
+import '../route_service.dart';
 import '../scheduled_events.dart';
 
 class MockServer {
@@ -65,6 +68,10 @@ class MockServer {
       return http.Response.fromStream(await passthrough!.send(copy));
     }
     try {
+      if (request.url.host == RouteService.routerHost) {
+        // Never passed to the real router (intent 0014).
+        return _json(await routerResponse(request.url));
+      }
       if (request.method == 'POST') {
         return _checkin(request);
       }
@@ -93,6 +100,61 @@ class MockServer {
     final report = jsonDecode(request.body) as Map<String, dynamic>;
     receivedReports.add(report);
     return _json({'status': 'OK', 'mock': true});
+  }
+
+  /// Fixture event the mock router finds no route for, so previews also
+  /// show the straight-line case (intent 0014).
+  static const unroutableEventID = '938017-402';
+
+  /// Canned OSRM-style answer for a router request [url]: a road-like
+  /// line that wiggles between the requested coordinates, or `NoRoute`
+  /// for the controls of [unroutableEventID] or a malformed request.
+  static Future<Map<String, dynamic>> routerResponse(Uri url) async {
+    final noRoute = {'code': 'NoRoute', 'routes': <Object>[]};
+    final coords = <LatLong>[];
+    for (final pair in url.pathSegments.last.split(';')) {
+      final xy = pair.split(',');
+      final long = double.tryParse(xy.first);
+      final lat = xy.length == 2 ? double.tryParse(xy.last) : null;
+      if (long == null || lat == null) return noRoute;
+      coords.add(LatLong(lat, long));
+    }
+    if (coords.length < 2) return noRoute;
+
+    final fixture = jsonDecode(await loadFixture()) as Map<String, dynamic>;
+    for (final e in (fixture['event_list'] as List).cast<Map>()) {
+      if (e['event_id'] != unroutableEventID) continue;
+      final first = (e['controls'] as List).first as Map;
+      final start = LatLong(
+          (first['lat'] as num).toDouble(), (first['long'] as num).toDouble());
+      if (RouteGeometry.groundDistance(coords.first, start) < 1) {
+        return noRoute;
+      }
+    }
+    return {
+      'code': 'Ok',
+      'routes': [
+        {'geometry': RoutePolyline.encode(cannedRoute(coords))}
+      ],
+    };
+  }
+
+  /// Through every point of [coords], with 4 points between each pair
+  /// offset alternately to each side by up to 4% of the segment.
+  static List<LatLong> cannedRoute(List<LatLong> coords) {
+    final out = <LatLong>[coords.first];
+    for (var i = 1; i < coords.length; i++) {
+      final a = coords[i - 1], b = coords[i];
+      final dLat = b.lat - a.lat, dLong = b.long - a.long;
+      for (var k = 1; k <= 4; k++) {
+        final t = k / 5;
+        final side = (k.isOdd ? 1 : -1) * 0.04;
+        out.add(LatLong(
+            a.lat + dLat * t - dLong * side, a.long + dLong * t + dLat * side));
+      }
+      out.add(b);
+    }
+    return out;
   }
 
   static Map<String, dynamic> _regionList() => {

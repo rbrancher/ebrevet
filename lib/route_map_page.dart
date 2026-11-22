@@ -18,6 +18,8 @@
 // control markers (intent 0011). Reuses the card map's tiles, attribution
 // and route overlay from route_map.dart. A collapsible ride summary sheet
 // (intent 0013, ride_summary_sheet.dart) lies over the bottom of the map.
+// The line follows the feed's route, else a routed road path
+// (route_service.dart), else straight segments (intent 0014).
 
 import 'dart:math';
 
@@ -25,11 +27,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
+import 'app_tokens.dart';
 import 'control.dart';
 import 'event.dart';
 import 'ride_summary_sheet.dart';
 import 'route_geometry.dart';
 import 'route_map.dart';
+import 'route_service.dart';
 import 'route_sketch.dart';
 
 class RouteMapPage extends StatefulWidget {
@@ -44,12 +48,29 @@ class RouteMapPage extends StatefulWidget {
   final WidgetBuilder? headerActions;
   final WidgetBuilder? rideActions;
 
+  /// Router for events without a feed route (intent 0014);
+  /// [RouteService.factory] is used when null.
+  final RouteService? routeService;
+
+  /// Longest wait for [routeService] before keeping the straight lines.
+  final Duration routeTimeout;
+
   const RouteMapPage(
       {super.key,
       required this.event,
       this.tileProvider,
       this.headerActions,
-      this.rideActions});
+      this.rideActions,
+      this.routeService,
+      this.routeTimeout = RouteService.timeout});
+
+  /// Label of a routed (not official) line, and its screen-reader label.
+  static const String approximateRouteLabel = 'Approximate road route';
+  static const String approximateRouteSemantics =
+      'approximate road route; may differ from the official course';
+
+  /// Label shown when no road route could be found.
+  static const String straightRouteLabel = 'Straight-line route';
 
   /// Pan and zoom (drag, pinch, scroll, double tap, fling); no rotation.
   static const int interactionFlags =
@@ -86,6 +107,21 @@ class RouteMapPage extends StatefulWidget {
   State<RouteMapPage> createState() => _RouteMapPageState();
 }
 
+/// Where the line on the full-screen map comes from (intent 0014).
+enum RouteSource {
+  /// The feed's `route_polyline`.
+  feed,
+
+  /// Waiting for the router; straight lines meanwhile, no label.
+  pending,
+
+  /// The router's road geometry, labelled approximate.
+  routed,
+
+  /// Straight lines between the controls, labelled.
+  straight,
+}
+
 class _RouteMapPageState extends State<RouteMapPage> {
   late final RouteGeometry _geometry = RouteGeometry.fromLatLongs(
       widget.event.controls.map((c) => LatLong(c.lat, c.long)));
@@ -99,6 +135,44 @@ class _RouteMapPageState extends State<RouteMapPage> {
   /// Bumped on every marker tap so the sheet expands even when the same
   /// control is tapped again.
   int _revealRequest = 0;
+
+  /// The road route drawn, if any, and where it came from (intent 0014).
+  List<LatLong>? _route;
+  RouteSource _source = RouteSource.straight;
+
+  @override
+  void initState() {
+    super.initState();
+    final feed = widget.event.route;
+    if (feed != null) {
+      _route = feed;
+      _source = RouteSource.feed;
+    } else if (_geometry.isDrawable) {
+      _requestRoute();
+    }
+  }
+
+  /// Asks the router once for the road between the usable controls (or
+  /// takes it from the session cache). Any failure keeps straight lines.
+  Future<void> _requestRoute() async {
+    final service = widget.routeService ?? RouteService.factory();
+    final key = RouteService.cacheKey(widget.event.eventID, _geometry.latLongs);
+    final cached = RouteService.cache[key];
+    if (cached != null) {
+      _route = cached;
+      _source = RouteSource.routed;
+      return;
+    }
+    _source = RouteSource.pending;
+    final route = await RouteService.routeFor(
+        service, widget.event.eventID, _geometry.latLongs,
+        timeout: widget.routeTimeout);
+    if (!mounted) return;
+    setState(() {
+      _route = route;
+      _source = route == null ? RouteSource.straight : RouteSource.routed;
+    });
+  }
 
   @override
   void dispose() {
@@ -148,6 +222,7 @@ class _RouteMapPageState extends State<RouteMapPage> {
                 controller: _map,
                 onMarkerTap: _onMarkerTap,
                 tileProvider: widget.tileProvider,
+                route: _route,
               )
             else
               // Not reached from the card (its placeholder is not tappable),
@@ -158,6 +233,10 @@ class _RouteMapPageState extends State<RouteMapPage> {
                         constraints.maxHeight)),
                 child: Center(child: RouteSketch(controls: event.controls)),
               ),
+            if (_geometry.isDrawable &&
+                (_source == RouteSource.routed ||
+                    _source == RouteSource.straight))
+              RouteSourceLabel(source: _source),
             RideSummarySheet(
               event: event,
               controller: _sheet,
@@ -188,6 +267,9 @@ class _RouteMapBody extends StatefulWidget {
   final ValueChanged<Control> onMarkerTap;
   final TileProvider? tileProvider;
 
+  /// Road route drawn instead of the straight segments (intent 0014).
+  final List<LatLong>? route;
+
   const _RouteMapBody(
       {required this.event,
       required this.geometry,
@@ -196,7 +278,8 @@ class _RouteMapBody extends StatefulWidget {
       required this.sheet,
       required this.controller,
       required this.onMarkerTap,
-      this.tileProvider});
+      this.tileProvider,
+      this.route});
 
   @override
   State<_RouteMapBody> createState() => _RouteMapBodyState();
@@ -234,7 +317,9 @@ class _RouteMapBodyState extends State<_RouteMapBody> {
       children: [
         // Visible tiles only; already loaded tiles are kept while panning.
         RouteMap.tileLayer(_tileProvider, keepBuffer: 2),
-        RouteOverlay(geometry: geometry),
+        // The camera is fitted to the controls only, so a route arriving
+        // later does not move it (intent 0014).
+        RouteOverlay(geometry: geometry, route: widget.route),
         MarkerLayer(
           markers: [
             for (var i = 0; i < controls.length; i++)
@@ -267,6 +352,55 @@ class _RouteMapBodyState extends State<_RouteMapBody> {
           child: const MapAttributionChip(),
         ),
       ],
+    );
+  }
+}
+
+/// Small chip at the top left of the map saying the line is an approximate
+/// road route or straight lines (intent 0014). Clear of the attribution
+/// chip (bottom right) and the sheet's handle.
+class RouteSourceLabel extends StatelessWidget {
+  final RouteSource source;
+
+  const RouteSourceLabel({super.key, required this.source});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final tokens = AppTokens.of(context);
+    final routed = source == RouteSource.routed;
+    return Align(
+      alignment: Alignment.topLeft,
+      child: Padding(
+        padding: EdgeInsets.all(tokens.spaceSmall),
+        child: Semantics(
+          container: true,
+          label: routed
+              ? RouteMapPage.approximateRouteSemantics
+              : RouteMapPage.straightRouteLabel,
+          excludeSemantics: true,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: scheme.surface,
+              borderRadius: BorderRadius.circular(tokens.radius),
+              border: Border.all(color: scheme.outlineVariant),
+            ),
+            child: Padding(
+              padding: EdgeInsets.symmetric(
+                  horizontal: tokens.spaceSmall, vertical: 2),
+              child: Text(
+                routed
+                    ? RouteMapPage.approximateRouteLabel
+                    : RouteMapPage.straightRouteLabel,
+                style: Theme.of(context)
+                    .textTheme
+                    .labelSmall
+                    ?.copyWith(color: scheme.onSurfaceVariant),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

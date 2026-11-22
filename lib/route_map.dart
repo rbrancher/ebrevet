@@ -261,19 +261,24 @@ class _TileMapState extends State<_TileMap> {
 class RouteOverlay extends StatelessWidget {
   final RouteGeometry geometry;
 
-  const RouteOverlay({super.key, required this.geometry});
+  /// Road route to draw instead of straight segments between the controls
+  /// (intent 0014, full-screen map only). Markers stay on the controls.
+  final List<LatLong>? route;
+
+  const RouteOverlay({super.key, required this.geometry, this.route});
 
   @override
   Widget build(BuildContext context) {
     final camera = MapCamera.of(context);
-    final points = [
-      for (final p in geometry.latLongs)
-        camera.latLngToScreenOffset(LatLng(p.lat, p.long))
-    ];
+    Offset screen(LatLong p) =>
+        camera.latLngToScreenOffset(LatLng(p.lat, p.long));
+    final route = this.route;
     return CustomPaint(
       painter: RouteSketchPainter.themed(
           geometry, Theme.of(context).colorScheme,
-          screenPoints: points),
+          screenPoints: [for (final p in geometry.latLongs) screen(p)],
+          routePoints:
+              route == null ? null : [for (final p in route) screen(p)]),
       child: const SizedBox.expand(),
     );
   }
