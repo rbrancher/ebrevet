@@ -3,18 +3,21 @@
 // Every map here uses a fake TileProvider (test/support/fake_tiles.dart) or
 // a recording http client; nothing touches the network.
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
 import 'package:ebrevet_card/control.dart';
 import 'package:ebrevet_card/event.dart';
+import 'package:ebrevet_card/event_card.dart';
 import 'package:ebrevet_card/mock/mock_server.dart';
 import 'package:ebrevet_card/my_settings.dart';
 import 'package:ebrevet_card/ride_summary_sheet.dart';
 import 'package:ebrevet_card/route_geometry.dart';
 import 'package:ebrevet_card/route_map.dart';
 import 'package:ebrevet_card/route_map_page.dart';
+import 'package:ebrevet_card/route_service.dart';
 import 'package:ebrevet_card/route_sketch.dart';
 import 'package:ebrevet_card/scheduled_events.dart';
 import 'package:flutter/material.dart';
@@ -25,8 +28,9 @@ import 'package:http/testing.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'event_list_screen_test.dart' show app, unmount;
+import 'event_list_screen_test.dart' show app, eventList, unmount;
 import 'route_map_test.dart' show tileCorner;
+import 'support/fake_route_service.dart';
 import 'support/fake_tiles.dart';
 import 'support/fixtures.dart';
 
@@ -974,6 +978,374 @@ void main() {
       expect(requests, isEmpty);
       expect(MockServer.receivedReports, isEmpty);
       await unmount(tester);
+    });
+  });
+
+  group('real route (intent 0014)', () {
+    late FakeRouteService fake;
+
+    setUp(() {
+      fake = FakeRouteService();
+      RouteService.factory = () => fake;
+    });
+
+    tearDown(() {
+      RouteService.factory = RouteService.defaultService;
+      RouteService.cache.clear();
+    });
+
+    /// The fixture's first event without a feed route.
+    Event unrouted() => events.firstWhere((e) => e.route == null);
+
+    List<LatLong> usable(Event e) => [
+          for (final c in RouteMapPage.usableControls(e.controls))
+            LatLong(c.lat, c.long)
+        ];
+
+    RouteOverlay overlay(WidgetTester tester) =>
+        tester.widget<RouteOverlay>(find.byType(RouteOverlay));
+
+    RouteSketchPainter painter(WidgetTester tester) => tester
+        .widget<CustomPaint>(find.descendant(
+            of: find.byType(RouteOverlay), matching: find.byType(CustomPaint)))
+        .painter! as RouteSketchPainter;
+
+    Widget page(Event event,
+            {Duration timeout = RouteService.timeout,
+            ThemeMode mode = ThemeMode.light}) =>
+        app(
+            RouteMapPage(
+                event: event,
+                tileProvider: FakeTileProvider(),
+                routeTimeout: timeout),
+            mode: mode);
+
+    final approxLabel = find.text(RouteMapPage.approximateRouteLabel);
+    final straightLabel = find.text(RouteMapPage.straightRouteLabel);
+
+    void expectNoErrorUi(WidgetTester tester) {
+      expect(tester.takeException(), isNull);
+      expect(find.byType(SnackBar), findsNothing);
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.byType(Dialog), findsNothing);
+    }
+
+    // AC4 (intent 0014)
+    testWidgets('feed route drawn in place of straight lines, no router call',
+        (tester) async {
+      final event = events.firstWhere((e) => e.route != null);
+      await tester.pumpWidget(page(event));
+      await tester.pump();
+      expect(overlay(tester).route, event.route);
+      final p = painter(tester);
+      expect(p.routePoints, hasLength(event.route!.length));
+      final camera = cameraOf(tester);
+      for (var i = 0; i < event.route!.length; i++) {
+        final r = event.route![i];
+        expect(p.routePoints![i],
+            camera.latLngToScreenOffset(LatLng(r.lat, r.long)));
+      }
+      // Start/finish markers and casing are drawn by the same painter, on
+      // the control points, and the named markers are a layer above.
+      expect(p.screenPoints, hasLength(usable(event).length));
+      expect(p.markers, isNotEmpty);
+      expect(p.casing, isNot(p.line));
+      final children =
+          tester.widget<FlutterMap>(find.byType(FlutterMap)).children;
+      expect(children.indexWhere((w) => w is MarkerLayer),
+          greaterThan(children.indexWhere((w) => w is RouteOverlay)));
+      expect(find.byType(ControlMarker), findsNWidgets(usable(event).length));
+      expect(fake.calls, 0);
+      expect(approxLabel, findsNothing);
+      expect(straightLabel, findsNothing);
+      await unmount(tester);
+    });
+
+    // AC7 (intent 0014)
+    testWidgets('routed fallback: drawn, labelled approximate, one call',
+        (tester) async {
+      final handle = tester.ensureSemantics();
+      final event = unrouted();
+      await tester.pumpWidget(page(event));
+      await tester.pump();
+      expect(fake.calls, 1);
+      expect(fake.requests.single, usable(event));
+      expect(overlay(tester).route, FakeRouteService.wiggle(usable(event)));
+      expect(painter(tester).routePoints,
+          hasLength(overlay(tester).route!.length));
+      expect(approxLabel, findsOneWidget);
+      expect(find.bySemanticsLabel(RouteMapPage.approximateRouteSemantics),
+          findsOneWidget);
+      expect(RouteMapPage.approximateRouteSemantics,
+          'approximate road route; may differ from the official course');
+      expect(straightLabel, findsNothing);
+      // Rebuilds and sheet use do not ask again.
+      await collapseSheet(tester);
+      await tester.pumpAndSettle();
+      expect(fake.calls, 1);
+      handle.dispose();
+      await unmount(tester);
+    });
+
+    // AC8 (intent 0014)
+    testWidgets('cache: reopening the same event makes no second call',
+        (tester) async {
+      final event = unrouted();
+      await tester.pumpWidget(page(event));
+      await tester.pump();
+      await unmount(tester);
+      await tester.pumpWidget(page(event));
+      // Drawn from the first frame, no request.
+      expect(overlay(tester).route, isNotNull);
+      expect(approxLabel, findsOneWidget);
+      await tester.pump();
+      expect(fake.calls, 1);
+      await unmount(tester);
+      // A changed control set asks again.
+      await tester.pumpWidget(page(withControls(event, lineControls())));
+      await tester.pump();
+      expect(fake.calls, 2);
+      await unmount(tester);
+    });
+
+    // AC8 (intent 0014)
+    testWidgets('failures are not cached: a later reopen retries',
+        (tester) async {
+      fake.answer = (c) async => null;
+      final event = unrouted();
+      await tester.pumpWidget(page(event));
+      await tester.pump();
+      expect(straightLabel, findsOneWidget);
+      await unmount(tester);
+      fake.answer = (c) async => FakeRouteService.wiggle(c);
+      await tester.pumpWidget(page(event));
+      await tester.pump();
+      expect(fake.calls, 2);
+      expect(approxLabel, findsOneWidget);
+      await unmount(tester);
+    });
+
+    // AC9 (intent 0014)
+    final failures = <String, Future<List<LatLong>?> Function(List<LatLong>)>{
+      'null': (c) async => null,
+      'throw': (c) async => throw const SocketException('offline'),
+      'one point': (c) async => [c.first],
+    };
+    for (final f in failures.entries) {
+      testWidgets('router ${f.key}: straight lines, subtle label, no error',
+          (tester) async {
+        final handle = tester.ensureSemantics();
+        fake.answer = f.value;
+        await tester.pumpWidget(page(unrouted()));
+        await tester.pump();
+        expect(overlay(tester).route, isNull);
+        expect(painter(tester).routePoints, isNull);
+        expect(straightLabel, findsOneWidget);
+        expect(find.bySemanticsLabel(RouteMapPage.straightRouteLabel),
+            findsOneWidget);
+        expect(approxLabel, findsNothing);
+        expectNoErrorUi(tester);
+        handle.dispose();
+        await unmount(tester);
+      });
+    }
+
+    // AC9 (intent 0014)
+    testWidgets('timeout: straight lines; no label while in flight',
+        (tester) async {
+      fake.answer = (c) => Completer<List<LatLong>?>().future;
+      await tester.pumpWidget(
+          page(unrouted(), timeout: const Duration(milliseconds: 200)));
+      await tester.pump(const Duration(milliseconds: 100));
+      // In flight: straight lines, no label of either kind.
+      expect(overlay(tester).route, isNull);
+      expect(find.byType(RouteOverlay), findsOneWidget);
+      expect(straightLabel, findsNothing);
+      expect(approxLabel, findsNothing);
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(straightLabel, findsOneWidget);
+      expect(overlay(tester).route, isNull);
+      expectNoErrorUi(tester);
+      await unmount(tester);
+    });
+
+    // AC9 (intent 0014)
+    testWidgets('a response after the page is disposed does nothing',
+        (tester) async {
+      final pending = Completer<List<LatLong>?>();
+      fake.answer = (c) => pending.future;
+      final event = unrouted();
+      await tester.pumpWidget(page(event));
+      await tester.pump();
+      await unmount(tester);
+      pending.complete(FakeRouteService.wiggle(usable(event)));
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+      expect(find.byType(RouteMapPage), findsNothing);
+    });
+
+    // AC10 (intent 0014)
+    testWidgets('cards and list: straight sketch, zero router calls',
+        (tester) async {
+      await tester.pumpWidget(app(eventList()));
+      await tester.pump();
+      expect(find.byType(EventCard), findsWidgets);
+      expect(find.byType(RouteMap), findsWidgets);
+      for (final o in find.byType(RouteOverlay).evaluate()) {
+        expect((o.widget as RouteOverlay).route, isNull);
+      }
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, -600));
+      await tester.pumpAndSettle();
+      for (final o in find.byType(RouteOverlay).evaluate()) {
+        expect((o.widget as RouteOverlay).route, isNull);
+      }
+      expect(fake.calls, 0);
+      await unmount(tester);
+    });
+
+    // AC11 (intent 0014)
+    testWidgets('router called only when the full-screen map opens',
+        (tester) async {
+      Finder cardMap(Event e) => find.byWidgetPredicate(
+          (w) => w is RouteMap && identical(w.controls, e.controls));
+      Future<void> open(Event e) async {
+        await unmount(tester);
+        await tester.pumpWidget(app(eventList()));
+        await tester.pump();
+        await tester.scrollUntilVisible(cardMap(e), 200,
+            scrollable: find.byType(Scrollable).first);
+        await tester.pumpAndSettle();
+        expect(fake.calls, 0, reason: 'the list made a call');
+        await tester.tap(cardMap(e));
+        await tester.pumpAndSettle();
+        expect(find.byType(RouteMapPage), findsOneWidget);
+      }
+
+      // A feed route: no call.
+      await open(events.firstWhere((e) => e.route != null));
+      expect(fake.calls, 0);
+      // No feed route: one call when the page opens, not again on reopen.
+      final event = unrouted();
+      await open(event);
+      expect(fake.calls, 1);
+      expect(approxLabel, findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tester.tap(cardMap(event));
+      await tester.pumpAndSettle();
+      expect(fake.calls, 1);
+      await unmount(tester);
+
+      // Non-drawable geometry: no call, no label.
+      await tester.pumpWidget(page(withControls(event, [
+        control(0, 40.0, -75.2),
+        control(1, 0, 0),
+      ])));
+      await tester.pump();
+      expect(fake.calls, 1);
+      expect(straightLabel, findsNothing);
+      expect(approxLabel, findsNothing);
+      await unmount(tester);
+    });
+
+    // AC12 (intent 0014)
+    testWidgets('camera fitted to the controls does not jump on arrival',
+        (tester) async {
+      final pending = Completer<List<LatLong>?>();
+      fake.answer = (c) => pending.future;
+      final event = unrouted();
+      await tester.pumpWidget(page(event));
+      await tester.pump();
+      final before = cameraOf(tester);
+      final mapSize = tester.getSize(find.byType(FlutterMap));
+      final geometry = RouteGeometry.fromLatLongs(usable(event));
+      final fitted = RouteMap.fittedCamera(geometry, mapSize,
+          padding: RouteMapPage.fitPadding(
+              RideSummarySheet.initialExtent(mapSize.height)));
+      expect(before.center, fitted.center);
+      // A route reaching well outside the controls arrives later.
+      final far = [
+        ...usable(event),
+        const LatLong(45, -70),
+        const LatLong(35, -80),
+      ];
+      pending.complete(far);
+      await tester.pumpAndSettle();
+      expect(overlay(tester).route, far);
+      final after = cameraOf(tester);
+      expect(after.center, before.center);
+      expect(after.zoom, before.zoom);
+      // Every usable control is still in view.
+      final rect = Offset.zero & mapSize;
+      for (final c in usable(event)) {
+        expect(rect.contains(after.latLngToScreenOffset(LatLng(c.lat, c.long))),
+            isTrue);
+      }
+      await unmount(tester);
+    });
+
+    // AC14 (intent 0014)
+    for (final mode in [ThemeMode.light, ThemeMode.dark]) {
+      testWidgets('labels themed, clear of attribution and handle ($mode)',
+          (tester) async {
+        final handle = tester.ensureSemantics();
+        for (final answer in <Future<List<LatLong>?> Function(List<LatLong>)>[
+          (c) async => FakeRouteService.wiggle(c),
+          (c) async => null,
+        ]) {
+          RouteService.cache.clear();
+          fake.answer = answer;
+          await tester.pumpWidget(page(unrouted(), mode: mode));
+          await tester.pump();
+          final label = find.byType(RouteSourceLabel);
+          expect(label, findsOneWidget);
+          final scheme = Theme.of(tester.element(label)).colorScheme;
+          final text = tester.widget<Text>(
+              find.descendant(of: label, matching: find.byType(Text)));
+          expect(text.style!.color, scheme.onSurfaceVariant);
+          final box = tester.widget<DecoratedBox>(
+              find.descendant(of: label, matching: find.byType(DecoratedBox)));
+          expect((box.decoration as BoxDecoration).color, scheme.surface);
+          final labelRect = tester.getRect(
+              find.descendant(of: label, matching: find.byType(DecoratedBox)));
+          final chip = tester.getRect(find.descendant(
+              of: find.byType(MapAttributionChip),
+              matching: find.byType(DecoratedBox)));
+          final handleRect =
+              tester.getRect(find.bySemanticsLabel(RegExp('ride summary')));
+          expect(labelRect.overlaps(chip), isFalse);
+          expect(labelRect.overlaps(handleRect), isFalse);
+          expect(labelRect.overlaps(tester.getRect(sheetSurface)), isFalse);
+          await expectLater(tester, meetsGuideline(textContrastGuideline));
+          await unmount(tester);
+        }
+        handle.dispose();
+      });
+    }
+
+    // AC14 + AC15 (intent 0014): no hard-coded colours; the route code
+    // touches no check-in, codes, ride state or reporting.
+    test('route sources use theme roles and touch no rider data', () {
+      for (final path in [
+        'lib/route_map_page.dart',
+        'lib/route_service.dart',
+        'lib/route_polyline.dart',
+      ]) {
+        final src = File(path).readAsStringSync();
+        expect(src, isNot(contains('Colors.')), reason: path);
+        expect(src, isNot(contains('Color(0x')), reason: path);
+        for (final f in [
+          'checkin.dart',
+          'signature.dart',
+          'report.dart',
+          'activated_event.dart',
+          'my_activated_events.dart',
+          'location.dart',
+          'app_settings.dart',
+        ]) {
+          expect(src, isNot(contains(f)), reason: '$path uses $f');
+        }
+      }
     });
   });
 }

@@ -23,6 +23,8 @@ import 'package:flutter_launcher_icons/custom_exceptions.dart';
 import 'control.dart';
 import 'time_till.dart';
 import 'region.dart';
+import 'route_geometry.dart';
+import 'route_polyline.dart';
 import 'app_settings.dart';
 import 'utility.dart';
 
@@ -192,6 +194,11 @@ class Event {
 
   final List<Control> controls = [];
 
+  /// The official route from the feed's optional `route_polyline` (intent
+  /// 0014), or null when absent or unusable. Not saved by [toJson]: a
+  /// restored ride gets it from the feed again.
+  List<LatLong>? route;
+
   Map<String, dynamic> get toJson => {
         'name': name,
         'start_time_window': startTimeWindow.toJson(),
@@ -270,6 +277,7 @@ class Event {
         break;
       }
     }
+    route = RoutePolyline.decode(json['route_polyline']);
     valid = true;
     // } catch (error) {
     //   var etxt = "Error converting JSON future event response: $error";

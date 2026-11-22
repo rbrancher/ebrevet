@@ -80,6 +80,11 @@ class RouteSketchPainter extends CustomPainter {
   /// null the points are fitted into the canvas with [RouteGeometry.fit].
   final List<Offset>? screenPoints;
 
+  /// Screen positions of a road route (intent 0014). When given (at least
+  /// 2 points) the line follows them instead of joining the controls with
+  /// straight segments; the markers stay on the controls, above the line.
+  final List<Offset>? routePoints;
+
   RouteSketchPainter({
     required this.geometry,
     required this.line,
@@ -88,11 +93,12 @@ class RouteSketchPainter extends CustomPainter {
     required this.finish,
     required this.intermediate,
     this.screenPoints,
+    this.routePoints,
   });
 
   /// The route colors, from the theme's [ColorScheme] only.
   factory RouteSketchPainter.themed(RouteGeometry geometry, ColorScheme scheme,
-          {List<Offset>? screenPoints}) =>
+          {List<Offset>? screenPoints, List<Offset>? routePoints}) =>
       RouteSketchPainter(
         geometry: geometry,
         line: scheme.primary,
@@ -101,6 +107,7 @@ class RouteSketchPainter extends CustomPainter {
         finish: scheme.onSurface,
         intermediate: scheme.onSurfaceVariant,
         screenPoints: screenPoints,
+        routePoints: routePoints,
       );
 
   /// Marker kind for each usable point, in control order. A loop gets one
@@ -126,8 +133,10 @@ class RouteSketchPainter extends CustomPainter {
         ];
     if (pts.length < 2) return;
 
-    final path = Path()..moveTo(pts.first.dx, pts.first.dy);
-    for (final p in pts.skip(1)) {
+    final linePts =
+        (routePoints != null && routePoints!.length >= 2) ? routePoints! : pts;
+    final path = Path()..moveTo(linePts.first.dx, linePts.first.dy);
+    for (final p in linePts.skip(1)) {
       path.lineTo(p.dx, p.dy);
     }
     Paint stroke(Color c, double w) => Paint()
@@ -179,6 +188,7 @@ class RouteSketchPainter extends CustomPainter {
   bool shouldRepaint(RouteSketchPainter oldDelegate) =>
       oldDelegate.geometry != geometry ||
       !listEquals(oldDelegate.screenPoints, screenPoints) ||
+      !listEquals(oldDelegate.routePoints, routePoints) ||
       oldDelegate.line != line ||
       oldDelegate.casing != casing ||
       oldDelegate.start != start ||

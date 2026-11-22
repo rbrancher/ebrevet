@@ -1,7 +1,10 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:ebrevet_card/mock/mock_server.dart';
+import 'package:ebrevet_card/route_geometry.dart';
 import 'package:ebrevet_card/route_map.dart';
+import 'package:ebrevet_card/route_service.dart';
 import 'package:ebrevet_card/scheduled_events.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -154,6 +157,103 @@ void main() {
       expect(
           (jsonDecode(checkin.body) as Map<String, dynamic>)['status'], 'OK');
       expect(forwarded, isEmpty);
+    });
+  });
+
+  // AC13 (intent 0014): canned router answers; the real router is never
+  // contacted.
+  group('MockServer router', () {
+    late List<http.BaseRequest> forwarded;
+
+    setUp(() {
+      forwarded = [];
+      MockServer.passthrough = MockClient((req) async {
+        forwarded.add(req);
+        return http.Response('real network', 200);
+      });
+    });
+
+    tearDown(() => MockServer.passthrough = null);
+
+    Future<List<LatLong>> coordsOf(String eventID) async {
+      final event =
+          (await mockEvents()).firstWhere((e) => e.eventID == eventID);
+      return [for (final c in event.controls) LatLong(c.lat, c.long)];
+    }
+
+    test('fixtures: some events have a feed route, others not; in sync',
+        () async {
+      final assets = File('assets/mock/future_events.json').readAsStringSync();
+      expect(File('examples/future_events.json').readAsStringSync(), assets);
+      final events = await mockEvents();
+      final routed = events.where((e) => e.route != null).toList();
+      expect(routed, isNotEmpty);
+      expect(events.where((e) => e.route == null).length, greaterThan(1));
+      // A feed route starts and ends at its event's start and finish.
+      for (final e in routed) {
+        final start = LatLong(e.controls.first.lat, e.controls.first.long);
+        final finish = LatLong(e.controls.last.lat, e.controls.last.long);
+        expect(
+            RouteGeometry.groundDistance(e.route!.first, start), lessThan(5));
+        expect(
+            RouteGeometry.groundDistance(e.route!.last, finish), lessThan(5));
+      }
+      expect(
+          events.any((e) =>
+              e.route == null && e.eventID == MockServer.unroutableEventID),
+          isTrue);
+    });
+
+    test('router GET gets a canned road route, never passed through', () async {
+      final event = (await mockEvents()).firstWhere(
+          (e) => e.route == null && e.eventID != MockServer.unroutableEventID);
+      final coords = [for (final c in event.controls) LatLong(c.lat, c.long)];
+      final url = RouteService.requestUrl(coords);
+      final r = await MockServer.handle(http.Request('GET', url));
+      expect(r.statusCode, 200);
+      final route = RouteService.parseResponse(r.statusCode, r.body);
+      expect(route, isNotNull);
+      expect(route!.length, greaterThan(coords.length));
+      expect(
+          RouteGeometry.groundDistance(route.first, coords.first), lessThan(5));
+      expect(
+          RouteGeometry.groundDistance(route.last, coords.last), lessThan(5));
+      expect(forwarded, isEmpty);
+
+      // The app's default service, routed through the mock client.
+      final viaApp = await http.runWithClient(
+          () => RouteService().fetchRoute(coords), MockServer.client);
+      expect(viaApp, route);
+      expect(forwarded, isEmpty);
+    });
+
+    test('the unroutable fixture event and malformed requests get NoRoute',
+        () async {
+      final unroutable = await coordsOf(MockServer.unroutableEventID);
+      final r = await MockServer.handle(
+          http.Request('GET', RouteService.requestUrl(unroutable)));
+      expect(RouteService.parseResponse(r.statusCode, r.body), isNull);
+      expect((jsonDecode(r.body) as Map)['code'], 'NoRoute');
+      for (final path in ['garbage', '1,2', 'a,b;c,d']) {
+        final bad = await MockServer.handle(
+            http.Request('GET', Uri.parse('${RouteService.endpoint}/$path')));
+        expect(RouteService.parseResponse(bad.statusCode, bad.body), isNull);
+      }
+      expect(forwarded, isEmpty);
+    });
+
+    test('other hosts are still not passed through; tiles still are', () async {
+      final unknown = await MockServer.handle(http.Request('GET',
+          Uri.parse('https://router.project-osrm.org/route/v1/driving/1,2')));
+      expect(unknown.statusCode, 404);
+      final lookalike = await MockServer.handle(http.Request(
+          'GET', Uri.parse('https://${RouteService.routerHost}.evil.test/x')));
+      expect(lookalike.statusCode, 404);
+      expect(forwarded, isEmpty);
+      final tile = await MockServer.handle(http.Request(
+          'GET', Uri.parse('https://${RouteMap.tileHost}/1/0/0.png')));
+      expect(tile.body, 'real network');
+      expect(forwarded.single.url.host, RouteMap.tileHost);
     });
   });
 }
