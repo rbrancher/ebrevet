@@ -1,8 +1,67 @@
-# eBrevet
+# eBrevet (unofficial AI-SDLC fork)
 
-![eBrevet](assets/images/eBrevet-128.png) 
+> [!IMPORTANT]
+> **This is an unofficial, experimental fork of [ctnadovich/ebrevet](https://github.com/ctnadovich/ebrevet), created and maintained by Chris Nadovich.**
+> - **Not the official app.** This fork is not the eBrevet app in the Apple App Store or Google Play Store. Chris Nadovich and randonneuring.org do not endorse or support it.
+> - **Not for real events.** Riders should not use it to ride events. For the official app and support, see the [eBrevet FAQ](https://randonneuring.org/about/ebrevet_faq).
+> - **Report problems with this fork here,** in [this repository's issues](https://github.com/rbrancher/ebrevet/issues), not to the original author or randonneuring.org.
+
+![eBrevet](assets/images/eBrevet-128.png)
+
+## About this fork
+
+This fork tries out an **autonomous AI software development lifecycle (AI-SDLC)** on a real app.
+- **Requests become specs.** Feature requests are written as GitHub issues, then turned into reviewed specs (`intents/`).
+- **AI agents build them.** Claude agents implement each spec, with tests, as a pull request that gets a web preview.
+- **A human approves each step.** A maintainer approves every spec and every merge.
+
+The pipeline is described in [`harness/README.md`](harness/README.md) and the agent rules in [`CLAUDE.md`](CLAUDE.md).
+
+**AI authorship.** Almost all code changed or added in this fork was written by AI agents and reviewed by a human. Files created in this fork carry the notice `Copyright (C) 2026 eBrevet autonomous AI-SDLC`. The original files keep Chris Nadovich's copyright notice.
+
+### Changes from upstream
+
+Upstream files changed in this fork are listed in the git history (`git log upstream/main..`) and in the specs under `intents/`. In summary:
+
+- **Mock mode** (`--dart-define=EBREVET_MOCK=true`). The app runs on sample event data with a fake server and a fake GPS. Nothing is posted to randonneuring.org or any club server.
+- **Test suite and CI.** Unit and widget tests, `flutter analyze`, `dart format` and a web build run on every pull request.
+- **Material 3 UI.** Design tokens and themed components, applied to every screen. The old Flushbar toasts were replaced with SnackBars.
+- **Rider profile.**
+  - A read-only profile page with ride stats, opened from the app bar.
+  - A full-screen rider edit form.
+- **Event cards.**
+  - A headline and subhead layout.
+  - A map of the route area on each card, using OpenStreetMap tiles.
+  - A responsive card grid on tablets and desktop.
+- **Full-screen route map.**
+  - Opens when you tap a card's map.
+  - Has a collapsible ride summary sheet.
+  - Draws the road route when one is available, and straight lines between controls otherwise.
+- **Multiple event regions** (in progress).
+  - Configure several regions, each with its own event cache.
+  - Switch between them on the events page.
+- **Stricter lints** (flutter_lints 6).
+
+### Web preview
+
+https://ebrevet.pages.dev is a demo build of this fork in **mock mode**.
+- **Mock data only.** It shows sample events only and never contacts randonneuring.org or any club server.
+- **No real check-ins.** Check-ins and start codes there are not real.
+
+### License
+
+Like the original, this fork is free software under the [GNU General Public License v3](LICENSE).
+
+---
+
+## The original eBrevet documentation
+
+*The rest of this README is the original project documentation by Chris Nadovich, kept unchanged.*
+- **It describes the official app.** Links to the app stores, the FAQ and randonneuring.org refer to the official app and its support, not to this fork.
+- **Some screens differ in this fork.** For example, Settings and the region selection work differently here.
 
 An electronic brevet card for randonneuring.
+
 
 ## Introduction
 
