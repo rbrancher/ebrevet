@@ -1,4 +1,4 @@
-// Copyright (C) 2023 Chris Nadovich
+// Copyright (C) 2026 eBrevet autonomous AI-SDLC
 // This file is part of eBrevet <https://github.com/ctnadovich/ebrevet>.
 //
 // eBrevet is free software: you can redistribute it and/or modify

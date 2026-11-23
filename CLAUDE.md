@@ -1,7 +1,8 @@
 # eBrevet: agent guide
 
 eBrevet (`ebrevet_card`) is a Flutter app that serves as an electronic brevet card for randonneuring.
-This repo is a private fork of `ctnadovich/ebrevet` (GPL-3), and changes to it are built by an AI-SDLC harness.
+This repo is a public, unofficial fork of `ctnadovich/ebrevet` (GPL-3), and changes to it are built by an AI-SDLC harness.
+It is not endorsed by the original author, Chris Nadovich.
 See `harness/README.md` for the pipeline.
 
 ## Commands
@@ -57,3 +58,4 @@ New code that does network or location access must go through these seams. Tests
 5. **Keep diffs small.** Stay within the intent and match the existing style. Avoid new dependencies unless the intent requires them.
 6. **Be careful with rider data.** Changes to check-in timing or distance rules, code generation, or persisted ride state are high-risk. A bug there can invalidate a rider's ride, so add regression tests.
 7. **Only this repository.** Interact only with `rbrancher/ebrevet` on GitHub. Never open issues or PRs, comment, push or otherwise act on any other repository, including upstream `ctnadovich/ebrevet`, even though this clone has an `upstream` remote. Pass `-R rbrancher/ebrevet` to `gh` when working locally.
+8. **Use the fork's copyright header on new files.** A new file under `lib/` starts with `// Copyright (C) 2026 eBrevet autonomous AI-SDLC`, followed by the same GPL-3 notice the existing files carry. Never copy `Copyright (C) 2023 Chris Nadovich` into a file you create. Leave the headers of existing upstream files as they are.
