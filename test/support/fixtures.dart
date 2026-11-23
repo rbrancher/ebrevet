@@ -14,7 +14,7 @@ void useMockServerForTests({String secret = 'ci-dummy-secret'}) {
   MockServer.loadFixture =
       () async => File('assets/mock/future_events.json').readAsString();
   MockServer.now = () => testNow;
-  MockServer.signingSecret = () => secret;
+  MockServer.signingSecret = (_) => secret;
   MockServer.receivedReports.clear();
 }
 

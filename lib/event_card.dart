@@ -871,7 +871,8 @@ class _EventCardState extends State<EventCard> {
   String? validateStartCode(String? s, Event event) {
     if (s == null || s.isEmpty) return "Missing start code";
     if (false == AppSettings.isRusaIDSet) return "Rider not set.";
-    if (ScheduledEvents.eventInfoSource == null) return "No event authority. ";
+    // Any configured source's data counts, not just the selected one's.
+    if (!ScheduledEvents.hasEventAuthority) return "No event authority. ";
 
     s = s.toUpperCase();
     s = s.trim();

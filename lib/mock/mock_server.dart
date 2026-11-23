@@ -32,10 +32,18 @@ class MockServer {
   static Future<String> Function() loadFixture =
       () => rootBundle.loadString(fixtureAsset);
 
-  /// Secret used to sign event feeds. Defaults to the secret the app
-  /// will verify with, so the signature check passes.
-  static String Function() signingSecret =
-      () => ScheduledEventsSource.fromSettingsSourceID().secret;
+  /// Secret used to sign the event feed requested for [regionID] (null or
+  /// unknown: the selected source, e.g. a custom URL). Defaults to the secret
+  /// the app will verify that source with, so the signature check passes.
+  static String Function(String? regionID) signingSecret = (regionID) =>
+      (regionID != null && Region.regionMap.containsKey(regionID))
+          ? Region(regionID: regionID).secret
+          : EventSources.selected.secret;
+
+  /// Region with its own sample feed (intent 0015), so mock mode has a
+  /// second region whose events differ from [Region.defaultRegion]'s.
+  /// Every other region gets the default fixture feed.
+  static const altRegionID = '905030'; // CA: San Francisco
 
   /// Clock, overridable in tests.
   static DateTime Function() now = DateTime.now;
@@ -81,8 +89,9 @@ class MockServer {
       final i = path.indexOf('scheduled_events');
       if (i >= 0) {
         // .../scheduled_events/<regionID>[/<nonce>]
+        final regionID = (path.length > i + 1) ? path[i + 1] : null;
         final nonce = (path.length > i + 2) ? path[i + 2] : null;
-        return _json(await scheduledEvents(nonce: nonce));
+        return _json(await scheduledEvents(nonce: nonce, regionID: regionID));
       }
       return http.Response('Not found in mock server: ${request.url}', 404);
     } catch (e) {
@@ -167,17 +176,29 @@ class MockServer {
 
   /// The signed scheduled-events feed, with the fixture's dates moved so the
   /// first event started 20 minutes ago and event i starts i days from now.
-  static Future<Map<String, dynamic>> scheduledEvents({String? nonce}) async {
+  /// [altRegionID] gets its own events (IDs, names and club code of that
+  /// region); any other region gets the fixture's events.
+  static Future<Map<String, dynamic>> scheduledEvents(
+      {String? nonce, String? regionID}) async {
     final fixture = jsonDecode(await loadFixture()) as Map<String, dynamic>;
     final events = (fixture['event_list'] as List).cast<Map<String, dynamic>>();
     final t0 = now().toUtc();
+    final alt = regionID == altRegionID;
 
     final shifted = <Map<String, dynamic>>[];
     for (var i = 0; i < events.length; i++) {
       final target = (i == 0)
           ? t0.subtract(const Duration(minutes: 20))
           : t0.add(Duration(days: i));
-      shifted.add(shiftEvent(events[i], target));
+      final e = shiftEvent(events[i], target);
+      if (alt) {
+        final n = (e['event_id'] as String).split('-').last;
+        e['event_id'] = '$altRegionID-$n';
+        e['club_acp_code'] = altRegionID;
+        e['name'] =
+            (e['name'] as String).replaceFirst('[MOCK] ', '[MOCK] Bay Area ');
+      }
+      shifted.add(e);
     }
 
     final feed = <String, dynamic>{
@@ -187,7 +208,7 @@ class MockServer {
       'nonce': nonce ?? 'nononce',
       'timestamp': t0.toIso8601String(),
     };
-    feed['signature'] = ScheduledEvents.signJson(feed, signingSecret());
+    feed['signature'] = ScheduledEvents.signJson(feed, signingSecret(regionID));
     return feed;
   }
 

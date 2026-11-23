@@ -53,7 +53,10 @@ class AppSettings {
   //////////
   // Filenames
   static const String scheduleEventsFilename =
-      'futureEvents.json'; // File to save events locally
+      'futureEvents.json'; // Single cache from before intent 0015 (legacy)
+  // Per-source event cache (intent 0015), named from the source's stable key.
+  static String scheduleEventsFilenameFor(String sourceKey) =>
+      'futureEvents-$sourceKey.json';
   static const String pastEventsFileName = 'pastEvents.json';
   static const String storedRegionsFilename =
       'regions.json'; // File to save regions locally

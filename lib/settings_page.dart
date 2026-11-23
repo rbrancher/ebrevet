@@ -111,13 +111,13 @@ class _EventSearchSettingsState extends State<EventSearchSettings> {
     // MyLogger.entry('Rebuilding region dropdown list.');
 
     // In some weird situations we could have a current region set
-    // to be somethnig that's not in the region map.
-
-    if (false == Region.regionMap.containsKey(AppSettings.regionID.value)) {
-      MyLogger.entry('Configured for region not in map. Setting to default.');
-      AppSettings.regionID.setValue(Region.defaultRegion);
-      AppSettings.scheduleEventsSourceID
-          .setValue(ScheduleEventsSourceID.defaultID);
+    // to be somethnig that's not in the region map (e.g. removed from the
+    // region list). It stays configured (intent 0015): the message below
+    // says so, and the rider can pick another region from the dropdown.
+    final bool isRegionKnown =
+        Region.regionMap.containsKey(AppSettings.regionID.value);
+    if (!isRegionKnown) {
+      MyLogger.entry('Configured for region not in map.');
     }
 
     // fromRegion and fromInternationalRegion are essentiall
@@ -166,18 +166,18 @@ class _EventSearchSettingsState extends State<EventSearchSettings> {
             AppSettings.scheduleEventsSourceID,
             onChanged: sourceSelection.updateFromSettings,
           ),
-          if (viewAllRegions)
-            if (Region.regionMap.containsKey(AppSettings.regionID.value))
-              DropDownSettingsTile(
-                AppSettings.regionID,
-                key: key,
-                itemList: regionList,
-                valueValid: isRegionSettingInList,
-                onChanged: sourceSelection.updateFromSettings,
-              )
-            else
+          if (viewAllRegions) ...[
+            if (!isRegionKnown)
               const Text("Somehow the region selected is not in the "
                   "list of regions this app knows about. Please try refreshing the region list."),
+            DropDownSettingsTile(
+              AppSettings.regionID,
+              key: key,
+              itemList: regionList,
+              valueValid: isRegionSettingInList,
+              onChanged: sourceSelection.updateFromSettings,
+            ),
+          ],
 
           // if (AppSettings.futureEventsSourceID.value ==
           //     FutureEventsSourceID.fromPerm)
@@ -330,7 +330,8 @@ class _AdvancedSettingsState extends State<AdvancedSettings> {
                   ),
                   OutlinedButton(
                     onPressed: () {
-                      ScheduledEvents.clear();
+                      // The selected source only (intent 0015).
+                      ScheduledEvents.clearSource(EventSources.selected);
                       sourceSelection.updateFromSettings();
                     },
                     child: const Text('Clear Event List'),
