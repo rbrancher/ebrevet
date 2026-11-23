@@ -40,7 +40,7 @@ finish → EventOutcomes (outcome.dart) → certificate (cert_page.dart) with fi
 | Area | Files |
 |---|---|
 | Entry and theme | `main.dart`, `day_night.dart` |
-| Settings | `app_settings.dart` (all settings and constants), `my_settings.dart` (MySetting<T> on prefs), `settings_page.dart`, `settings_tiles.dart` |
+| Settings | `app_settings.dart` (all settings and constants), `my_settings.dart` (MySetting<T> on prefs), `settings_page.dart`, `settings_tiles.dart`, `region_picker_page.dart` (full-screen picker for the configured event sources: add, remove, reorder) |
 | Regions | `region.dart` (built-in region map plus refresh), `region_data.dart` (secrets, gitignored; CI uses `harness/ci/region_data.stub.dart`) |
 | Event feed | `scheduled_events.dart` (fetch, verify, per-source caches, `EventSources` source list and selection, `SourceSelection`), `event.dart`, `control.dart` |
 | Ride state | `activated_event.dart`, `my_activated_events.dart`, `outcome.dart`, `control_state.dart` |
