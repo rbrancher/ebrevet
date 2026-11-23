@@ -13,7 +13,7 @@ The app is a Flutter app of about 11k lines. `lib/` is flat, with one subfolder,
    1. prefs
    2. package info
    3. `Region.fetchRegionsFromDisk`
-   4. `ScheduledEvents.refreshEventsFromDisk`
+   4. `ScheduledEvents.refreshEventsFromDisk`: on first run after an upgrade it migrates the old single-source settings to the source list (`EventSources`) and adopts the legacy `futureEvents.json` cache. Then it loads every configured source's cache.
    5. `MyActivatedEvents.load`
 3. `runApp(MultiProvider(DayNight, ControlState, SourceSelection))`, which shows `ScheduledEventsPage` (`event_list_page.dart`).
 
@@ -24,7 +24,10 @@ region list (randonneuring.org/ebrevet/region_list, or the built-in map in regio
 scheduled events feed (<region server>/scheduled_events/<region>/<nonce>)
    └─ ScheduledEvents.refreshScheduledEventsFromServer
         checks: nonce + HMAC-SHA256 signature (signJson) + minimum_app_version
-        → Event.fromJson / Control.fromMap → ScheduledEvents.events → disk
+        → Event.fromJson / Control.fromMap → that source's cache
+          (ScheduledEvents.cacheFor(source), futureEvents-<source key>.json)
+        ScheduledEvents.events = the selected source's events;
+        ScheduledEvents.findEvent looks across all configured sources
 rider taps RIDE / PRE-RIDE + enters start code (Signature.startCode)
    └─ ActivatedEvent (activated_event.dart), stored by MyActivatedEvents → pastEvents.json
 check-in at a control (control_card.dart → checkin.dart)
@@ -39,7 +42,7 @@ finish → EventOutcomes (outcome.dart) → certificate (cert_page.dart) with fi
 | Entry and theme | `main.dart`, `day_night.dart` |
 | Settings | `app_settings.dart` (all settings and constants), `my_settings.dart` (MySetting<T> on prefs), `settings_page.dart`, `settings_tiles.dart` |
 | Regions | `region.dart` (built-in region map plus refresh), `region_data.dart` (secrets, gitignored; CI uses `harness/ci/region_data.stub.dart`) |
-| Event feed | `scheduled_events.dart` (fetch, verify, cache, `SourceSelection`), `event.dart`, `control.dart` |
+| Event feed | `scheduled_events.dart` (fetch, verify, per-source caches, `EventSources` source list and selection, `SourceSelection`), `event.dart`, `control.dart` |
 | Ride state | `activated_event.dart`, `my_activated_events.dart`, `outcome.dart`, `control_state.dart` |
 | Check-in rules and codes | `checkin.dart`, `signature.dart` (start, check-in, report and finish codes), `location.dart` |
 | Server reporting | `report.dart` (POST check-ins, fetch other riders' status) |

@@ -34,53 +34,53 @@ As a rider, I want the app to keep each configured event source and its cached e
 separately so that I can look at another region later without losing the first one's data.
 
 ## Acceptance criteria
-- [ ] AC1: Source list. A new persisted, ordered list of configured sources, each being an
+- [x] AC1: Source list. A new persisted, ordered list of configured sources, each being an
       International region, a US region or the custom URL source (a region entry holds its
       region ID and category; the custom entry uses the existing custom URL and secret
       settings). Duplicates are not allowed. Stored through `MySetting`/shared
       preferences as JSON. Unreadable or invalid stored data gives the default list and
       never throws. Unit tests: round trip, order kept, duplicate rejected, garbage input.
-- [ ] AC2: Migration. With the new list absent, the list is built from the old
+- [x] AC2: Migration. With the new list absent, the list is built from the old
       `scheduleEventsSourceID` and `regionID` settings as exactly one entry. With none of
       the old settings set (fresh install) it is the default region (938017, PA Rando). A
       custom-URL install migrates to the single custom entry. Migration runs once, does not
       overwrite an existing list, and leaves the old settings keys untouched. Tests for each
       case, including an install with a region ID no longer in `Region.regionMap`.
-- [ ] AC3: Selected source. The selected source is persisted and survives restart. If it is
+- [x] AC3: Selected source. The selected source is persisted and survives restart. If it is
       missing from the list (removed), the first source is used. An empty list falls back
       to the default region. Tests.
-- [ ] AC4: Separate caches. Each source has its own in-memory event list, last-refreshed
+- [x] AC4: Separate caches. Each source has its own in-memory event list, last-refreshed
       time and cache file (named from a stable source key). Refreshing or selecting one
       source never clears or changes another's cache. `SourceSelection.updateFromSettings()`
       and Settings no longer wipe other sources' data. Regression test: load A, load B,
       A's events and last-refreshed are unchanged.
-- [ ] AC5: Legacy cache. The existing single `scheduled_events` cache file is adopted as the
+- [x] AC5: Legacy cache. The existing single `scheduled_events` cache file is adopted as the
       cache of the migrated first source (read once, then kept under the new name), so a
       rider upgrading offline still sees their events. It is not adopted if its recorded
       `event_info_source` does not match that source. Test both.
-- [ ] AC6: Per-source refresh and verification. Refreshing fetches only the given source,
+- [x] AC6: Per-source refresh and verification. Refreshing fetches only the given source,
       using that source's URL and secret (region secret for regions, custom secret for
       custom), with the existing nonce and HMAC checks. A signature made with another
       source's secret is rejected and leaves that source's cache untouched. Tests use a
       fake fetch, never the network.
-- [ ] AC7: Cross-source lookup. A lookup by event ID resolves across every configured
+- [x] AC7: Cross-source lookup. A lookup by event ID resolves across every configured
       source's cache, independent of the selected one. Activated events, My Rides, check-in
       and start-code checks behave the same as before (their saved state is unchanged and
       does not depend on which source is selected). Test: an event from B resolves while A
       is selected; saved ride JSON keys are unchanged.
-- [ ] AC8: A removed or unknown region. A configured region ID that no longer exists in
+- [x] AC8: A removed or unknown region. A configured region ID that no longer exists in
       `Region.regionMap` stays in the list, shows the existing "unknown region" style
       message where Settings shows it today, and never crashes the list page or refresh.
       Test.
-- [ ] AC9: No visible change. The existing Settings screen and event list behave as today for
+- [x] AC9: No visible change. The existing Settings screen and event list behave as today for
       a single source: the event list shows the selected source's events and its refreshed
       time, and "Update event data" refreshes only the selected source. Existing widget
       tests keep passing.
-- [ ] AC10: Mock mode. `MockServer` serves a distinct sample feed for at least two region
+- [x] AC10: Mock mode. `MockServer` serves a distinct sample feed for at least two region
       IDs (different event names/IDs per region, correctly signed for that region's
       secret as today); unknown regions get the current feed. `mock_server_test.dart` shows
       two regions return different events. Tests never hit the network.
-- [ ] AC11: No change to check-in rules, codes (`signature.dart`), the saved ride format or
+- [x] AC11: No change to check-in rules, codes (`signature.dart`), the saved ride format or
       server reporting. `flutter analyze`, `flutter test` and `dart format` are green.
 
 ## Out of scope

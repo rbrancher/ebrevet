@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:ebrevet_card/event.dart';
 import 'package:ebrevet_card/mock/mock_server.dart';
 import 'package:ebrevet_card/route_geometry.dart';
 import 'package:ebrevet_card/route_map.dart';
@@ -41,6 +42,68 @@ void main() {
       final controls = (e['controls'] as List).cast<Map<String, dynamic>>();
       final firstOpen = DateTime.parse(controls[0]['open']);
       expect(firstOpen, start); // start control opens at the start time
+    });
+
+    // AC10 (intent 0015): two regions get different, correctly signed feeds.
+    test('two regions return different events, each signed', () async {
+      Future<Map<String, dynamic>> get(String region) async {
+        final r = await MockServer.handle(http.Request(
+            'GET',
+            Uri.parse('https://randonneuring.org/ebrevet/scheduled_events/'
+                '$region/n0nce')));
+        expect(r.statusCode, 200);
+        return jsonDecode(r.body) as Map<String, dynamic>;
+      }
+
+      List<Map<String, dynamic>> eventsOf(Map<String, dynamic> feed) =>
+          (feed['event_list'] as List).cast<Map<String, dynamic>>();
+
+      final pa = await get('938017');
+      final alt = await get(MockServer.altRegionID);
+      final unknown = await get('999999');
+
+      final paIDs = {for (final e in eventsOf(pa)) e['event_id']};
+      final altIDs = {for (final e in eventsOf(alt)) e['event_id']};
+      expect(paIDs, isNotEmpty);
+      expect(altIDs, isNotEmpty);
+      expect(paIDs.intersection(altIDs), isEmpty);
+      expect(
+          altIDs.every((id) => '$id'.startsWith('${MockServer.altRegionID}-')),
+          isTrue);
+      expect(
+          {for (final e in eventsOf(pa)) e['name']}
+              .intersection({for (final e in eventsOf(alt)) e['name']}),
+          isEmpty);
+      expect(
+          eventsOf(alt)
+              .every((e) => e['club_acp_code'] == MockServer.altRegionID),
+          isTrue);
+      // Unknown regions get the current feed.
+      expect({for (final e in eventsOf(unknown)) e['event_id']}, paIDs);
+      for (final feed in [pa, alt, unknown]) {
+        expect(
+            ScheduledEvents.verifySignature(feed, 'ci-dummy-secret'), isTrue);
+        expect(feed['nonce'], 'n0nce');
+      }
+      // Every alt event still parses with the real model.
+      for (final e in eventsOf(alt)) {
+        expect(Event.fromJson(e).valid, isTrue);
+      }
+    });
+
+    test('each feed is signed with the secret for the requested region',
+        () async {
+      MockServer.signingSecret = (rid) => 'secret-for-$rid';
+      final pa = await MockServer.scheduledEvents(regionID: '938017');
+      final alt =
+          await MockServer.scheduledEvents(regionID: MockServer.altRegionID);
+      expect(ScheduledEvents.verifySignature(pa, 'secret-for-938017'), isTrue);
+      expect(
+          ScheduledEvents.verifySignature(
+              alt, 'secret-for-${MockServer.altRegionID}'),
+          isTrue);
+      expect(
+          ScheduledEvents.verifySignature(alt, 'secret-for-938017'), isFalse);
     });
 
     test('every event parses with the real Event model', () async {

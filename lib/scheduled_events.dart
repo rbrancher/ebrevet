@@ -28,6 +28,7 @@ import 'app_settings.dart';
 import 'mylogger.dart';
 import 'region.dart';
 import 'report.dart';
+import 'my_settings.dart';
 // import 'permanent.dart';
 
 // import 'current.dart';
@@ -47,8 +48,34 @@ enum ScheduleEventsSourceID {
       ScheduleEventsSourceID.fromRegion;
 }
 
+// One configured event source (intent 0015): a region (US or International,
+// with its own region ID) or the custom URL source, which uses the custom URL
+// and secret settings.
+
 class ScheduledEventsSource {
   final ScheduleEventsSourceID id;
+
+  /// Region ID (ACP club code) for region sources; null for the custom URL
+  /// source. Also null in a legacy cache record, which only stored [id].
+  final String? regionID;
+
+  bool get isCustom => id == ScheduleEventsSourceID.fromURL;
+
+  /// Stable identity, used for duplicate checks and to name the cache file.
+  /// The US and International categories are two views of the same region
+  /// list, so a region ID gives the same key in either.
+  String get key => isCustom
+      ? 'custom'
+      : 'region-${(regionID ?? '').replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_')}';
+
+  /// The region this source refers to. A legacy record without a region ID
+  /// falls back to the region setting, as before.
+  Region get region => Region(regionID: regionID ?? AppSettings.regionID.value);
+
+  /// True for a region source whose ID is not in [Region.regionMap].
+  bool get isUnknownRegion =>
+      !isCustom &&
+      !Region.regionMap.containsKey(regionID ?? AppSettings.regionID.value);
 
   String get description => id.description;
 
@@ -67,7 +94,7 @@ class ScheduledEventsSource {
     switch (id) {
       case ScheduleEventsSourceID.fromRegion:
       case ScheduleEventsSourceID.fromInternationalRegion:
-        var rgn = Region.fromSettings();
+        var rgn = region;
         d = rgn.regionName;
         break;
       case ScheduleEventsSourceID.fromURL:
@@ -78,20 +105,24 @@ class ScheduledEventsSource {
     return d;
   }
 
+  /// The single source described by the old settings
+  /// (`scheduleEventsSourceID`, `regionID`), which the Settings screen edits.
   factory ScheduledEventsSource.fromSettingsSourceID() {
     var sourceID = AppSettings.scheduleEventsSourceID.value;
-    return ScheduledEventsSource(sourceID);
+    return ScheduledEventsSource(sourceID,
+        regionID: sourceID == ScheduleEventsSourceID.fromURL
+            ? null
+            : AppSettings.regionID.value);
   }
 
-  ScheduledEventsSource(this.id);
+  ScheduledEventsSource(this.id, {this.regionID});
 
   String get url {
-    var sourceID = AppSettings.scheduleEventsSourceID.value;
     String eventsURL;
-    switch (sourceID) {
+    switch (id) {
       case ScheduleEventsSourceID.fromRegion:
       case ScheduleEventsSourceID.fromInternationalRegion:
-        var rgn = Region.fromSettings();
+        var rgn = region;
         eventsURL = rgn.scheduledEventsURL;
         break;
       case ScheduleEventsSourceID.fromURL:
@@ -102,12 +133,11 @@ class ScheduledEventsSource {
   }
 
   String get secret {
-    var sourceID = AppSettings.scheduleEventsSourceID.value;
     String secret;
-    switch (sourceID) {
+    switch (id) {
       case ScheduleEventsSourceID.fromRegion:
       case ScheduleEventsSourceID.fromInternationalRegion:
-        var rgn = Region.fromSettings();
+        var rgn = region;
         secret = rgn.secret;
         break;
       case ScheduleEventsSourceID.fromURL:
@@ -118,11 +148,164 @@ class ScheduledEventsSource {
   }
 
   ScheduledEventsSource.fromJson(Map<String, dynamic> json)
-      : id = ScheduleEventsSourceID.fromJson(json['id']);
+      : id = ScheduleEventsSourceID.fromJson(json['id']),
+        regionID = (json['id'] == ScheduleEventsSourceID.fromURL.name)
+            ? null
+            : json['region_id'] as String?;
 
+  // 'id' keeps the old format, so an older app version can still read it.
   Map<String, dynamic> toJson() => {
         'id': id.toJson(),
+        if (regionID != null) 'region_id': regionID,
       };
+}
+
+// The persisted, ordered list of configured event sources and the selected
+// one (intent 0015). Stored as JSON through MySetting. The old single-source
+// settings keys are never written here, so a downgrade still works.
+
+class EventSources {
+  static final MySetting<String> _listSetting = MySetting<String>(
+      key: 'key-event-sources', defaultValue: '', title: 'Event Sources');
+
+  static final MySetting<String> _selectedSetting = MySetting<String>(
+      key: 'key-selected-event-source',
+      defaultValue: '',
+      title: 'Selected Event Source');
+
+  static ScheduledEventsSource get defaultSource =>
+      ScheduledEventsSource(ScheduleEventsSourceID.fromRegion,
+          regionID: Region.defaultRegion);
+
+  static List<ScheduledEventsSource> get defaultList => [defaultSource];
+
+  /// True once a source list has been stored (migration has run).
+  static bool get isStored => _listSetting.value.isNotEmpty;
+
+  /// The configured sources, in order. Before migration this is the list
+  /// migration would store. Unreadable or invalid stored data gives
+  /// [defaultList]; this never throws.
+  static List<ScheduledEventsSource> get list {
+    if (!isStored) return migratedFromLegacy();
+    return decode(_listSetting.value) ?? defaultList;
+  }
+
+  /// The one entry described by the old settings: the custom entry for a
+  /// custom URL install, otherwise that region (even one no longer in
+  /// [Region.regionMap]). A fresh install gives [defaultSource].
+  static List<ScheduledEventsSource> migratedFromLegacy() =>
+      [ScheduledEventsSource.fromSettingsSourceID()];
+
+  /// Stores the migrated list if no list is stored yet. Returns true if it
+  /// did. The old settings keys are left untouched.
+  static Future<bool> migrate() async {
+    if (isStored) return false;
+    final migrated = migratedFromLegacy();
+    MyLogger.entry('Migrating event source settings to ${migrated.first.key}');
+    await save(migrated);
+    return true;
+  }
+
+  /// Parses a stored list. Returns null for anything invalid: not JSON, not
+  /// a list, a bad entry, or a duplicate.
+  static List<ScheduledEventsSource>? decode(String s) {
+    try {
+      final decoded = jsonDecode(s);
+      if (decoded is! List) return null;
+      final result = <ScheduledEventsSource>[];
+      for (final e in decoded) {
+        if (e is! Map<String, dynamic>) return null;
+        final source = entryFromJson(e);
+        if (source == null || !canAdd(result, source)) return null;
+        result.add(source);
+      }
+      return result;
+    } catch (e) {
+      MyLogger.entry('Invalid stored event source list: $e',
+          severity: Severity.warning);
+      return null;
+    }
+  }
+
+  static ScheduledEventsSource? entryFromJson(Map<String, dynamic> e) {
+    final category = e['category'];
+    if (category is! String) return null;
+    final id = ScheduleEventsSourceID.values.asNameMap()[category];
+    if (id == null) return null;
+    if (id == ScheduleEventsSourceID.fromURL) return ScheduledEventsSource(id);
+    final rid = e['region_id'];
+    if (rid is! String || rid.isEmpty) return null;
+    return ScheduledEventsSource(id, regionID: rid);
+  }
+
+  static Map<String, dynamic> entryToJson(ScheduledEventsSource s) => {
+        'category': s.id.name,
+        if (!s.isCustom) 'region_id': s.regionID,
+      };
+
+  static String encode(List<ScheduledEventsSource> sources) =>
+      jsonEncode([for (final s in sources) entryToJson(s)]);
+
+  /// False if [source] is already in [sources] (same [ScheduledEventsSource.key]).
+  static bool canAdd(
+          List<ScheduledEventsSource> sources, ScheduledEventsSource source) =>
+      sources.every((s) => s.key != source.key);
+
+  /// Stores [sources]. Throws [ArgumentError] on a duplicate or on a region
+  /// entry without a region ID.
+  static Future<void> save(List<ScheduledEventsSource> sources) async {
+    final checked = <ScheduledEventsSource>[];
+    for (final s in sources) {
+      if (!s.isCustom && (s.regionID == null || s.regionID!.isEmpty)) {
+        throw ArgumentError('Region source without a region ID');
+      }
+      if (!canAdd(checked, s)) {
+        throw ArgumentError('Duplicate event source ${s.key}');
+      }
+      checked.add(s);
+    }
+    await _listSetting.setValue(encode(checked));
+  }
+
+  /// Appends [source]. Returns false (and stores nothing) for a duplicate.
+  static Future<bool> add(ScheduledEventsSource source) async {
+    final sources = list;
+    if (!canAdd(sources, source)) return false;
+    await save([...sources, source]);
+    return true;
+  }
+
+  /// The selected source: the stored selection if it is in [list], else
+  /// the first source, else (empty list) [defaultSource].
+  static ScheduledEventsSource get selected {
+    final sources = list;
+    if (sources.isEmpty) return defaultSource;
+    final key = _selectedSetting.value;
+    return sources.firstWhere((s) => s.key == key, orElse: () => sources.first);
+  }
+
+  static Future<void> select(ScheduledEventsSource source) =>
+      _selectedSetting.setValue(source.key);
+
+  /// For the single-source Settings screen: [source] takes the place of its
+  /// own entry if already listed (e.g. a US/International category change),
+  /// else of the selected entry, and becomes the selection. No cache is
+  /// touched.
+  static Future<void> replaceSelected(ScheduledEventsSource source) async {
+    final sources = list;
+    var i = sources.indexWhere((s) => s.key == source.key);
+    if (i < 0) {
+      final current = selected.key;
+      i = sources.indexWhere((s) => s.key == current);
+    }
+    if (i < 0) {
+      sources.add(source);
+    } else {
+      sources[i] = source;
+    }
+    await save(sources);
+    await select(source);
+  }
 }
 
 // This class stores the currently selected event info source
@@ -130,22 +313,58 @@ class ScheduledEventsSource {
 
 class SourceSelection extends ChangeNotifier {
   ScheduledEventsSource eventInfoSource;
+  bool _disposed = false;
 
-  SourceSelection()
-      : eventInfoSource = ScheduledEventsSource.fromSettingsSourceID();
+  SourceSelection() : eventInfoSource = EventSources.selected;
 
+  /// Called when the Settings screen changes the source settings. Only the
+  /// selected source changes; other sources' caches are kept.
   void updateFromSettings() {
-    // final newEventInfoSource = ScheduledEventsSource.fromSettingsSourceID();
-    // if (newEventInfoSource.sourceID != eventInfoSource.sourceID) {
-    ScheduledEvents.clear();
-    // }
-    eventInfoSource = ScheduledEventsSource.fromSettingsSourceID();
+    final next = ScheduledEventsSource.fromSettingsSourceID();
+    if (next.isCustom && next.key == EventSources.selected.key) {
+      // The custom URL or secret may have changed: the custom cache may hold
+      // another server's events, so drop it (as before, for this source only).
+      ScheduledEvents.clearSource(next);
+    }
+    EventSources.replaceSelected(next);
+    eventInfoSource = next;
     notifyListeners();
+    ScheduledEvents.ensureLoaded(next).then((_) {
+      if (!_disposed) notifyListeners();
+    });
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 }
 
+/// The events, refresh time and origin cached for one source.
+class SourceCache {
+  var events = <Event>[];
+  DateTime? lastRefreshed;
+  ScheduledEventsSource? eventInfoSource;
+
+  /// Whether the disk cache has been read (or the cache set) this session.
+  bool loaded = false;
+}
+
 class ScheduledEvents {
-  static var events = <Event>[]; // List of ALL events that have been loaded
+  static final Map<String, SourceCache> _caches = {};
+
+  /// The in-memory cache for [source] (by key), created empty if needed.
+  static SourceCache cacheFor(ScheduledEventsSource source) =>
+      _caches.putIfAbsent(source.key, SourceCache.new);
+
+  static SourceCache get _selectedCache => cacheFor(EventSources.selected);
+
+  /// Events of the selected source.
+  static List<Event> get events => _selectedCache.events;
+  static set events(List<Event> list) => _selectedCache
+    ..events = list
+    ..loaded = true;
 
   static List<Event> getFilteredEvents(EventFilter filter) {
     final result = events.where((e) => filter.apply(e)).toList();
@@ -153,25 +372,116 @@ class ScheduledEvents {
     return result;
   }
 
-  static ScheduledEventsSource?
-      eventInfoSource; // where did the above list of events come from
+  /// Where the selected source's cached events came from.
+  static ScheduledEventsSource? get eventInfoSource =>
+      _selectedCache.eventInfoSource;
   static const eventInfoSourceFieldName = 'event_info_source';
 
-  static DateTime? lastRefreshed; // Time when last refreshed from server
+  /// When the selected source was last refreshed from its server.
+  static DateTime? get lastRefreshed => _selectedCache.lastRefreshed;
   static const lastRefreshedFieldName = 'last_refreshed';
 
-  static var storedEvents = FileStorage(AppSettings.scheduleEventsFilename);
+  /// True if any configured source holds server data (the start-code check
+  /// needs an event authority). Does not depend on the selected source.
+  static bool get hasEventAuthority =>
+      EventSources.list.any((s) => _caches[s.key]?.eventInfoSource != null);
 
-  static void clear() {
-    events.clear();
-    lastRefreshed = null;
-    // refreshCount.value = 0;
-    //   rider = null;
-    eventInfoSource = null;
-    storedEvents.clear();
+  /// Looks [eventID] up in every configured source's cache, in list order,
+  /// independent of the selected source.
+  static Event? findEvent(String eventID) {
+    for (final s in EventSources.list) {
+      for (final e in _caches[s.key]?.events ?? const <Event>[]) {
+        if (e.eventID == eventID) return e;
+      }
+    }
+    return null;
   }
 
+  /// The cache written before intent 0015, for one source only.
+  static var legacyStoredEvents =
+      FileStorage(AppSettings.scheduleEventsFilename);
+
+  /// Prefs flag: the legacy cache was considered for adoption (once).
+  static const legacyAdoptedKey = 'key-legacy-events-cache-adopted';
+
+  /// The cache file of [source], named from its stable key.
+  static FileStorage storageFor(ScheduledEventsSource source) =>
+      FileStorage(AppSettings.scheduleEventsFilenameFor(source.key));
+
+  /// Clears the in-memory and disk cache of [source] only.
+  static void clearSource(ScheduledEventsSource source) {
+    _caches[source.key] = SourceCache()..loaded = true;
+    storageFor(source).clear();
+  }
+
+  /// Forgets every in-memory cache (tests). Disk files are kept.
+  static void resetMemory() => _caches.clear();
+
+  /// At startup: migrates the source settings (adopting the legacy cache
+  /// for the migrated source), then loads every configured source's cache.
+  /// Returns the selected source's last-refreshed description.
   static Future<String> refreshEventsFromDisk() async {
+    if (!EventSources.isStored) {
+      await adoptLegacyCache(EventSources.migratedFromLegacy().first);
+      await EventSources.migrate();
+    }
+    var result = 'unknown';
+    final selectedKey = EventSources.selected.key;
+    for (final s in EventSources.list) {
+      final lrs = await loadSourceFromDisk(s);
+      if (s.key == selectedKey) result = lrs;
+    }
+    return result;
+  }
+
+  /// Loads [source]'s cache from disk unless already loaded this session.
+  static Future<void> ensureLoaded(ScheduledEventsSource source) async {
+    if (!cacheFor(source).loaded) await loadSourceFromDisk(source);
+  }
+
+  /// Copies the legacy single cache file to [source]'s cache file, once, if
+  /// its recorded `event_info_source` matches [source] and [source] has no
+  /// cache yet. The legacy file is left in place for a downgrade.
+  static Future<bool> adoptLegacyCache(ScheduledEventsSource source) async {
+    final prefs = MySetting.prefs;
+    if (prefs.getBool(legacyAdoptedKey) == true) return false;
+    await prefs.setBool(legacyAdoptedKey, true);
+
+    final legacy = await legacyStoredEvents.readJSON();
+    if (legacy.isEmpty) return false;
+    final recorded = legacy[eventInfoSourceFieldName];
+    if (recorded is! Map<String, dynamic> ||
+        !legacySourceMatches(recorded, source)) {
+      MyLogger.entry('Legacy event cache is not from ${source.key}; '
+          'not adopted.');
+      return false;
+    }
+    final target = storageFor(source);
+    if ((await target.readJSON()).isNotEmpty) return false;
+    legacy[eventInfoSourceFieldName] = source;
+    final ok = await target.writeJSON(legacy);
+    MyLogger.entry('Adopted legacy event cache as ${target.fileName}: $ok');
+    return ok;
+  }
+
+  /// A legacy record has only the category ('id'): it matches a region
+  /// source if it names a region category (and the same region ID, if it
+  /// has one), and the custom source if it names the custom URL.
+  static bool legacySourceMatches(
+      Map<String, dynamic> recorded, ScheduledEventsSource source) {
+    try {
+      final r = ScheduledEventsSource.fromJson(recorded);
+      if (r.isCustom != source.isCustom) return false;
+      return r.isCustom || r.regionID == null || r.regionID == source.regionID;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  static Future<String> loadSourceFromDisk(ScheduledEventsSource source) async {
+    final storedEvents = storageFor(source);
+    final cache = cacheFor(source);
+    cache.loaded = true;
     Map<String, dynamic> eventMapFromFile;
     try {
       MyLogger.entry("** Refreshing events from ${storedEvents.fileName}");
@@ -185,34 +495,32 @@ class ScheduledEvents {
 
       var lrs = '';
       if (eventMapFromFile.isNotEmpty) {
-        rebuildEventList(eventMapFromFile);
+        cache.events = parseEventList(eventMapFromFile);
 
         if (eventMapFromFile.containsKey(lastRefreshedFieldName)) {
           var timestamp = eventMapFromFile[lastRefreshedFieldName];
           lrs = "lastRefreshed = $timestamp";
-          lastRefreshed = DateTime.tryParse(timestamp)?.toLocal();
+          cache.lastRefreshed = DateTime.tryParse(timestamp)?.toLocal();
         } else {
-          lastRefreshed = null;
+          cache.lastRefreshed = null;
           lrs = "Unkown";
         }
 
         if (eventMapFromFile.containsKey(eventInfoSourceFieldName)) {
-          eventInfoSource = ScheduledEventsSource.fromJson(
+          cache.eventInfoSource = ScheduledEventsSource.fromJson(
               eventMapFromFile[eventInfoSourceFieldName]);
         } else {
-          eventInfoSource = ScheduledEventsSource.fromSettingsSourceID();
+          cache.eventInfoSource = source;
         }
 
-        // refreshCount.value++;
         MyLogger.entry(
-            "Successfully restored ${events.length} events from disk. Last Refreshed = $lrs");
+            "Successfully restored ${cache.events.length} events from disk. Last Refreshed = $lrs");
         return lrs;
-        //refreshCount.value;
       } else {
         throw NoPreviousDataException("Future events file read was empty.");
       }
     } catch (error) {
-      events.clear();
+      cache.events = [];
       MyLogger.entry("Couldn't refresh future events from FILE: $error");
       return 'unknown'; // 0;
     }
@@ -241,70 +549,7 @@ class ScheduledEvents {
   static Future<bool> refreshScheduledEventsFromServer(
       ScheduledEventsSource scheduleEventsSource, BuildContext context) async {
     try {
-      MyLogger.entry(
-          "Refreshing events from SERVER for ${scheduleEventsSource.description} with"
-          " URL ${scheduleEventsSource.url}");
-
-      // Then try to fetch from the server in background with callback to process
-      // Note that we add a nonce to the URL
-
-      String sourceURL = "";
-      bool authenticating = true;
-      String txNonce = 'nononce';
-      String authSecret = '';
-
-      if (AppSettings.authenticateEventsData.value) {
-        txNonce = generateNonce();
-        sourceURL = "${scheduleEventsSource.url}/$txNonce";
-        authSecret = scheduleEventsSource.secret;
-      } else {
-        sourceURL = scheduleEventsSource.url;
-        authenticating = false;
-      }
-
-      var eventMapFromServer = await fetchScheduledEventsFromServer(sourceURL);
-      if (null == eventMapFromServer) return false;
-
-      // Verify signature
-
-      // If the region was selected from the internal list of regions,
-      // the associated region secret is in the Region object
-      // But if the Event Info Source was a custom URL, then
-      // the secret must be obtained from the settings
-      // Presumably the sc
-
-      String rxSignature = eventMapFromServer['signature'] ?? '';
-      String rxNonce = eventMapFromServer['nonce'] ?? '';
-
-      if (authenticating && (rxNonce != txNonce)) {
-        throw ServerException('Nonce mismatch: TX: "$txNonce"; RX: "$rxNonce"');
-      }
-
-      if (authenticating &&
-          (false == verifySignature(eventMapFromServer, authSecret))) {
-        MyLogger.entry(
-            severity: Severity.hidden,
-            "Bad signature assuming secret = '${maskSecondHalf(authSecret)}'");
-        throw ServerException('Signature invalid RX: $rxSignature');
-      }
-
-      if (authenticating) {
-        MyLogger.entry(
-            'Received scheduled events map for Nonce="$rxNonce"; with valid Signature="$rxSignature"');
-      }
-
-      rebuildEventList(eventMapFromServer);
-      var now = DateTime.now();
-      eventMapFromServer[lastRefreshedFieldName] =
-          now.toUtc().toIso8601String();
-      eventMapFromServer[eventInfoSourceFieldName] = scheduleEventsSource;
-      var writeStatus = await storedEvents.writeJSON(
-          eventMapFromServer); // Save what we just downloaded to disk
-      lastRefreshed = now;
-      eventInfoSource = scheduleEventsSource;
-
-      // refreshCount.value++;
-      MyLogger.entry("Refresh complete. Write status: $writeStatus");
+      await refreshSource(scheduleEventsSource);
     } on CueWizardException catch (error) {
       if (context.mounted) {
         // Deliberately not awaited: refresh finishes without waiting for the
@@ -317,7 +562,7 @@ class ScheduledEvents {
           // Deliberately not awaited, as above.
           unawaited(versionErrorDialog(error, scheduleEventsSource, context));
         }
-        events.clear();
+        cacheFor(scheduleEventsSource).events = [];
       } else {
         AppSnack.show(error.toString(), style: AppSnackStyle.error);
       }
@@ -326,6 +571,85 @@ class ScheduledEvents {
       return false;
     }
     return true;
+  }
+
+  /// Fetches, verifies and caches the feed of [scheduleEventsSource] only,
+  /// with that source's URL and secret. Throws on any failure, leaving the
+  /// source's cache unchanged. Other sources' caches are never touched.
+  static Future<void> refreshSource(
+      ScheduledEventsSource scheduleEventsSource) async {
+    if (scheduleEventsSource.isUnknownRegion) {
+      throw ServerException('Unknown region ${scheduleEventsSource.regionID}. '
+          'Try getting the latest region list.');
+    }
+    MyLogger.entry(
+        "Refreshing events from SERVER for ${scheduleEventsSource.description} with"
+        " URL ${scheduleEventsSource.url}");
+
+    // Then try to fetch from the server in background with callback to process
+    // Note that we add a nonce to the URL
+
+    String sourceURL = "";
+    bool authenticating = true;
+    String txNonce = 'nononce';
+    String authSecret = '';
+
+    if (AppSettings.authenticateEventsData.value) {
+      txNonce = generateNonce();
+      sourceURL = "${scheduleEventsSource.url}/$txNonce";
+      authSecret = scheduleEventsSource.secret;
+    } else {
+      sourceURL = scheduleEventsSource.url;
+      authenticating = false;
+    }
+
+    var eventMapFromServer = await fetchScheduledEventsFromServer(sourceURL);
+    if (null == eventMapFromServer) {
+      throw ServerException('No event data from $sourceURL');
+    }
+
+    // Verify signature
+
+    // If the region was selected from the internal list of regions,
+    // the associated region secret is in the Region object
+    // But if the Event Info Source was a custom URL, then
+    // the secret must be obtained from the settings
+    // Presumably the sc
+
+    String rxSignature = eventMapFromServer['signature'] ?? '';
+    String rxNonce = eventMapFromServer['nonce'] ?? '';
+
+    if (authenticating && (rxNonce != txNonce)) {
+      throw ServerException('Nonce mismatch: TX: "$txNonce"; RX: "$rxNonce"');
+    }
+
+    if (authenticating &&
+        (false == verifySignature(eventMapFromServer, authSecret))) {
+      MyLogger.entry(
+          severity: Severity.hidden,
+          "Bad signature assuming secret = '${maskSecondHalf(authSecret)}'");
+      throw ServerException('Signature invalid RX: $rxSignature');
+    }
+
+    if (authenticating) {
+      MyLogger.entry(
+          'Received scheduled events map for Nonce="$rxNonce"; with valid Signature="$rxSignature"');
+    }
+
+    final newEvents = parseEventList(eventMapFromServer);
+    var now = DateTime.now();
+    eventMapFromServer[lastRefreshedFieldName] = now.toUtc().toIso8601String();
+    eventMapFromServer[eventInfoSourceFieldName] = scheduleEventsSource;
+    var writeStatus = await storageFor(scheduleEventsSource)
+        .writeJSON(eventMapFromServer); // Save what we just downloaded to disk
+    cacheFor(scheduleEventsSource)
+      ..events = newEvents
+      ..lastRefreshed = now
+      ..eventInfoSource = scheduleEventsSource
+      ..loaded = true;
+
+    // refreshCount.value++;
+    MyLogger.entry("Refresh complete. Write status: $writeStatus");
   }
 
   static String maskSecondHalf(String s) {
@@ -410,10 +734,10 @@ class ScheduledEvents {
   // the preferred URL for this will be 'ebrevet/scheduled_events' with
   // the previous 'ebrevet/future_events' depreciated.
 
-  static void rebuildEventList(Map eventMap) {
+  static List<Event> parseEventList(Map eventMap) {
     List el = eventMap['event_list'];
-    MyLogger.entry("Start rebuildEventList() from ${el.length} events in Map");
-    events.clear();
+    MyLogger.entry("Start parseEventList() from ${el.length} events in Map");
+    final events = <Event>[];
     for (var e in el) {
       var eventToAdd = Event.fromJson(e);
 
@@ -447,6 +771,7 @@ class ScheduledEvents {
     // rider = r;
     var n = events.length;
     MyLogger.entry("Event List rebuilt with $n events.");
+    return events;
   }
 
   static Future<Map<String, dynamic>?> fetchScheduledEventsFromServer(
