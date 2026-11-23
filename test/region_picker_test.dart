@@ -292,8 +292,8 @@ void main() {
       expect(stored(), ['905030', '938017', 'custom']);
       await tapAndSettle(tester, rowButton(c.key, 'Move up'));
       expect(stored(), ['905030', 'custom', '938017']);
-      // Until the switcher (slice c), the first source is the one shown.
-      expect(EventSources.selected.key, b.key);
+      // AC8 (intent 0017): a reorder keeps the selection.
+      expect(EventSources.selected.key, a.key);
     });
 
     testWidgets('drag handle reorders', (tester) async {

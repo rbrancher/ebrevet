@@ -59,7 +59,9 @@ void main() {
         regionSource('905030'),
         regionSource('750128',
             category: ScheduleEventsSourceID.fromInternationalRegion),
-      ], selectFirst: true);
+      ]);
+      // A reorder keeps the selection (intent 0017); select explicitly.
+      await selection.select(customSource);
       selection.dispose();
 
       await restart();
@@ -150,8 +152,8 @@ void main() {
   });
 
   test(
-      'AC10 (intent 0016): moving a source first shows its events '
-      '(before the slice c switcher)', () async {
+      'AC10 (intent 0016), updated by AC8 (intent 0017): moving a source '
+      'first keeps the selected source', () async {
     final a = regionSource('938017');
     final b = regionSource(MockServer.altRegionID);
     await EventSources.save([a, b]);
@@ -160,11 +162,16 @@ void main() {
     final selection = SourceSelection();
     expect([for (final e in ScheduledEvents.events) e.eventID], ids(a));
 
-    // The picker's move up / drag passes selectFirst.
-    await selection.setSources([b, a], selectFirst: true);
+    // The picker's move up / drag no longer selects the first source.
+    await selection.setSources([b, a]);
+    expect(selection.eventInfoSource.key, a.key);
+    expect([for (final e in ScheduledEvents.events) e.eventID], ids(a));
+    expect(ids(b), isNot(ids(a)));
+
+    // The events page switcher selects explicitly.
+    await selection.select(b);
     expect(selection.eventInfoSource.key, b.key);
     expect([for (final e in ScheduledEvents.events) e.eventID], ids(b));
-    expect(ids(b), isNot(ids(a)));
 
     // Adding a source keeps showing the selected one.
     await selection.setSources([b, a, customSource]);
@@ -185,8 +192,7 @@ void main() {
       expect(oldRegion, '750128');
 
       final selection = SourceSelection();
-      await selection.setSources([customSource, regionSource('905030')],
-          selectFirst: true);
+      await selection.setSources([customSource, regionSource('905030')]);
       await selection.setSources([regionSource('905030')]);
       await selection.customSettingsChanged();
       selection.dispose();
