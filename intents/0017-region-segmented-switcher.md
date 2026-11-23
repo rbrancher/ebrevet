@@ -55,6 +55,10 @@ can look at another region's calendar instantly, even offline.
 - [ ] AC8: Settings changes. Adding, removing or reordering sources in Settings updates
       the switcher when returning to the events page (including its appearing for two
       sources and disappearing for one). Widget test.
+      Reordering in Settings no longer changes the selection: drop the slice (b)
+      "reorder selects the first source" behaviour (`selectFirst` on reorders) now that
+      the switcher selects explicitly. Removing the selected source still selects the
+      first remaining one. Test: select B, move A below C, B stays selected.
 - [ ] AC9: Mock mode. In the mock-mode web preview with two regions configured, the
       switcher shows both and switching shows the distinct mock feeds.
 - [ ] AC10: Activated events, My Rides, check-in and start-code lookups still resolve
@@ -77,3 +81,6 @@ go to the events page, switch between them, refresh one, restart and check the s
 Use a Material 3 `SegmentedButton` (single selection) when the segments fit, otherwise
 the scrollable fallback in AC6. Keep labels short. Risk is low: UI-only change on top of
 the data model from slice (a); it reads and writes only the selected-source setting.
+
+New files under `lib/` start with `// Copyright (C) 2026 eBrevet autonomous AI-SDLC` and the
+same GPL-3 notice the existing files carry, never a copied `Chris Nadovich` line.
