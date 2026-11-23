@@ -179,18 +179,27 @@ class _LatestEventListState extends State<LatestEventList> {
     var sourceSelection = context.watch<SourceSelection>();
 
     return Stack(children: [
-      // Responsive grid of cards under a full-width header (intent 0012).
-      ResponsiveCardGrid(
-        header: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: eventListHeader(sourceSelection),
-        ),
-        cards: [
-          for (final e in events)
-            EventCard(
-              e,
-              onEventsUpdated: refreshPage,
-            ), // All the Event Cards
+      Column(
+        children: [
+          // Region switcher above the header; built only for two or more
+          // configured sources (intent 0017).
+          const RegionSwitcher(),
+          Expanded(
+            // Responsive grid of cards under a full-width header (intent 0012).
+            child: ResponsiveCardGrid(
+              header: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: eventListHeader(sourceSelection),
+              ),
+              cards: [
+                for (final e in events)
+                  EventCard(
+                    e,
+                    onEventsUpdated: refreshPage,
+                  ), // All the Event Cards
+              ],
+            ),
+          ),
         ],
       ),
       if (fetchingFromServerNow)
@@ -290,6 +299,92 @@ class _LatestEventListState extends State<LatestEventList> {
         style: TextStyle(fontStyle: FontStyle.italic),
       ),
     ];
+  }
+}
+
+/// Region switcher at the top of the events page (intent 0017): one
+/// single-select segment per configured source (`EventSources.list`), in
+/// configured order. Selecting one persists it and shows that source's
+/// cached events, with no network call. Nothing is built for one source.
+///
+/// Many sources: the Material 3 `SegmentedButton` sits in a horizontal
+/// scroll view. When the segments fit it is centred and does not scroll;
+/// when they do not (about 5 sources at 390 dp) the row scrolls sideways and
+/// the selected segment is scrolled into view.
+class RegionSwitcher extends StatefulWidget {
+  const RegionSwitcher({super.key});
+
+  @override
+  State<RegionSwitcher> createState() => _RegionSwitcherState();
+}
+
+class _RegionSwitcherState extends State<RegionSwitcher> {
+  Map<String, GlobalKey> _segmentKeys = {};
+  String? _scrolledTo;
+
+  void _scrollIntoView(String key) {
+    if (_scrolledTo == key) return;
+    _scrolledTo = key;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = _segmentKeys[key]?.currentContext;
+      if (ctx == null || !ctx.mounted) return;
+      Scrollable.ensureVisible(ctx,
+          alignment: 0.5, duration: const Duration(milliseconds: 200));
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final selection = context.watch<SourceSelection>();
+    final sources = EventSources.list;
+    if (sources.length < 2) {
+      _scrolledTo = null;
+      return const SizedBox.shrink();
+    }
+    final selectedKey = EventSources.selected.key;
+    _segmentKeys = {
+      for (final s in sources) s.key: _segmentKeys[s.key] ?? GlobalKey(),
+    };
+    _scrollIntoView(selectedKey);
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: AppTokens.of(context).spaceSmall),
+      child: LayoutBuilder(
+        builder: (context, constraints) => SingleChildScrollView(
+          key: const Key('region-switcher-scroll'),
+          scrollDirection: Axis.horizontal,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minWidth: constraints.maxWidth),
+            child: Center(
+              child: SegmentedButton<String>(
+                key: const Key('region-switcher'),
+                showSelectedIcon: false,
+                segments: [
+                  for (final s in sources)
+                    ButtonSegment<String>(
+                      value: s.key,
+                      tooltip: s.fullDescription,
+                      label: Semantics(
+                        key: _segmentKeys[s.key],
+                        label: s.fullDescription,
+                        excludeSemantics: true,
+                        child: Text(s.shortLabel),
+                      ),
+                    ),
+                ],
+                selected: {selectedKey},
+                onSelectionChanged: (keys) {
+                  final key = keys.first;
+                  for (final s in sources) {
+                    if (s.key == key) selection.select(s);
+                  }
+                },
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

@@ -24,44 +24,44 @@ As a rider, I want to switch between my configured regions on the events page so
 can look at another region's calendar instantly, even offline.
 
 ## Acceptance criteria
-- [ ] AC1: Switcher placement. `lib/event_list_page.dart` shows a Material 3 region
+- [x] AC1: Switcher placement. `lib/event_list_page.dart` shows a Material 3 region
       switcher under the app bar and above the existing header (source info, last
       refreshed, "Update event data"), with one segment per entry of `EventSources.list`
       in configured order. Widget test with three sources.
-- [ ] AC2: Hidden for one source. With one configured source no switcher is built and the
+- [x] AC2: Hidden for one source. With one configured source no switcher is built and the
       page looks as it does today. Widget test.
-- [ ] AC3: Labels. Each segment has a short label (the region's short name, "Custom" for
+- [x] AC3: Labels. Each segment has a short label (the region's short name, "Custom" for
       the custom source, the region ID for a region not in `Region.regionMap`). The full
       name (`fullDescription`) is the tooltip and the semantics label. Widget test.
-- [ ] AC4: Instant switching. Selecting a segment updates `SourceSelection` and persists
+- [x] AC4: Instant switching. Selecting a segment updates `SourceSelection` and persists
       the choice through `EventSources.select`. The list then shows that source's cached
       events and that source's own last-refreshed time, with no network call. Other
       sources' caches and last-refreshed times are unchanged. Widget test with two
       cached sources.
-- [ ] AC5: Per-source refresh. "Update event data" refreshes only the selected source
+- [x] AC5: Per-source refresh. "Update event data" refreshes only the selected source
       (existing behaviour; tested through the mock server): after refreshing B, A's
       events and last-refreshed time are unchanged. Test.
-- [ ] AC6: Many sources. With more sources than fit (about 5 at 390 dp) the switcher is a
+- [x] AC6: Many sources. With more sources than fit (about 5 at 390 dp) the switcher is a
       horizontally scrollable row of single-select segments (for example a scrollable
       `SegmentedButton` or `ChoiceChip` row) and the selected segment is scrolled into
       view. The chosen behaviour is documented in a code comment and in
       `docs/ARCHITECTURE.md` if it describes the events page. Widget test at 390 dp with 5
       sources: no overflow errors, the last segment is reachable by scrolling and
       tappable.
-- [ ] AC7: Remembered. The last selection is restored after a restart: a new
+- [x] AC7: Remembered. The last selection is restored after a restart: a new
       `SourceSelection` with the saved preferences selects the same source and the
       switcher shows it selected. Test. If the saved selection was removed in Settings,
       the first source is selected (existing `EventSources.selected` rule).
-- [ ] AC8: Settings changes. Adding, removing or reordering sources in Settings updates
+- [x] AC8: Settings changes. Adding, removing or reordering sources in Settings updates
       the switcher when returning to the events page (including its appearing for two
       sources and disappearing for one). Widget test.
       Reordering in Settings no longer changes the selection: drop the slice (b)
       "reorder selects the first source" behaviour (`selectFirst` on reorders) now that
       the switcher selects explicitly. Removing the selected source still selects the
       first remaining one. Test: select B, move A below C, B stays selected.
-- [ ] AC9: Mock mode. In the mock-mode web preview with two regions configured, the
+- [x] AC9: Mock mode. In the mock-mode web preview with two regions configured, the
       switcher shows both and switching shows the distinct mock feeds.
-- [ ] AC10: Activated events, My Rides, check-in and start-code lookups still resolve
+- [x] AC10: Activated events, My Rides, check-in and start-code lookups still resolve
       across all sources whichever is selected (existing tests keep passing). No change
       to check-in rules, codes (`signature.dart`), the saved ride format or server
       reporting. `flutter analyze`, `flutter test` and `dart format` are green.

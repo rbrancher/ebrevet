@@ -57,11 +57,8 @@ class _RegionPickerPageState extends State<RegionPickerPage> {
     super.dispose();
   }
 
-  Future<void> _save(List<ScheduledEventsSource> sources,
-      {bool selectFirst = false}) async {
-    await context
-        .read<SourceSelection>()
-        .setSources(sources, selectFirst: selectFirst);
+  Future<void> _save(List<ScheduledEventsSource> sources) async {
+    await context.read<SourceSelection>().setSources(sources);
     if (mounted) setState(() {});
   }
 
@@ -80,14 +77,14 @@ class _RegionPickerPageState extends State<RegionPickerPage> {
     ]);
   }
 
-  /// Before the events page switcher (slice c), the first source is the one
-  /// shown, so a reorder selects the new first source.
+  /// A reorder keeps the selected source; the events page switcher selects
+  /// explicitly (intent 0017).
   Future<void> _move(int from, int to) async {
     final sources = EventSources.list;
     if (from == to || to < 0 || to >= sources.length) return;
     final s = sources.removeAt(from);
     sources.insert(to, s);
-    await _save(sources, selectFirst: true);
+    await _save(sources);
   }
 
   bool _matches(Map<String, String> r, String q) {

@@ -79,6 +79,15 @@ class ScheduledEventsSource {
 
   String get description => id.description;
 
+  /// Short label for the events page region switcher (intent 0017): the
+  /// region's short name, "Custom" for the custom URL source, or the region
+  /// ID for a region not in [Region.regionMap].
+  String get shortLabel {
+    if (isCustom) return 'Custom';
+    if (isUnknownRegion) return regionID ?? AppSettings.regionID.value;
+    return region.regionSubName;
+  }
+
   String get fullDescription {
     return "${id.description}: $subDescription";
   }
@@ -289,12 +298,12 @@ class EventSources {
       _selectedSetting.setValue(source.key);
 
   /// Stores [sources] as the new list (intent 0016, region picker). If the
-  /// selected source is no longer listed, or [selectFirst] is set, the first
-  /// source becomes selected. Every removed source has its cache file and
+  /// selected source is no longer listed, the first source becomes selected;
+  /// otherwise the selection is kept, also on a reorder (intent 0017; the
+  /// events page switcher selects explicitly). Every removed source has its cache file and
   /// in-memory cache dropped; other sources' caches are untouched. Throws
   /// [ArgumentError] for an empty list or a duplicate (see [save]).
-  static Future<void> update(List<ScheduledEventsSource> sources,
-      {bool selectFirst = false}) async {
+  static Future<void> update(List<ScheduledEventsSource> sources) async {
     if (sources.isEmpty) {
       throw ArgumentError('At least one event source is required');
     }
@@ -302,9 +311,10 @@ class EventSources {
     final oldSelected = selected.key;
     await save(sources);
     final keys = {for (final s in sources) s.key};
-    if (selectFirst || !keys.contains(oldSelected)) {
-      await select(sources.first);
-    }
+    // Store the kept selection explicitly: with no stored selection the
+    // first source is selected, and a reorder must not change that.
+    final kept = sources.where((s) => s.key == oldSelected);
+    await select(kept.isNotEmpty ? kept.first : sources.first);
     for (final s in old) {
       if (!keys.contains(s.key)) await ScheduledEvents.removeSource(s);
     }
@@ -332,9 +342,16 @@ class SourceSelection extends ChangeNotifier {
 
   /// The region picker changed the source list (intent 0016); see
   /// [EventSources.update].
-  Future<void> setSources(List<ScheduledEventsSource> sources,
-      {bool selectFirst = false}) async {
-    await EventSources.update(sources, selectFirst: selectFirst);
+  Future<void> setSources(List<ScheduledEventsSource> sources) async {
+    await EventSources.update(sources);
+    await refresh();
+  }
+
+  /// The rider picked [source] in the events page switcher (intent 0017):
+  /// persists the choice and shows that source's cached events, with no
+  /// network call. Other sources' caches are untouched.
+  Future<void> select(ScheduledEventsSource source) async {
+    await EventSources.select(source);
     await refresh();
   }
 

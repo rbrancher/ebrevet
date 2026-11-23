@@ -193,7 +193,8 @@ void main() {
       ];
 
       final selection = SourceSelection();
-      await selection.setSources([b, a], selectFirst: true);
+      await selection.setSources([b, a]);
+      await selection.select(b);
       expect(EventSources.selected.key, 'region-${MockServer.altRegionID}');
       expect(selection.eventInfoSource.key, 'region-${MockServer.altRegionID}');
       expect(ScheduledEvents.events, isEmpty); // B not loaded yet
@@ -204,7 +205,7 @@ void main() {
       expect((await ScheduledEvents.storageFor(a).readJSON()), isNotEmpty);
 
       // Switching back shows A's events again, without a refresh.
-      await selection.setSources([a, b], selectFirst: true);
+      await selection.select(a);
       expect([for (final e in ScheduledEvents.events) e.eventID], aEvents);
       selection.dispose();
     });
