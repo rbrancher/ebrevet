@@ -1,8 +1,8 @@
 # eBrevet (unofficial AI-SDLC fork)
 
 > [!IMPORTANT]
-> **This is an unofficial, experimental fork of [ctnadovich/ebrevet](https://github.com/ctnadovich/ebrevet), created and maintained by Chris Nadovich.**
-> - **Not the official app.** This fork is not the eBrevet app in the Apple App Store or Google Play Store. Chris Nadovich and randonneuring.org do not endorse or support it.
+> **This is an unofficial, experimental fork of [ctnadovich/ebrevet](https://github.com/ctnadovich/ebrevet).**
+> - **Not the official app.** This fork is not the eBrevet app in the Apple App Store or Google Play Store.
 > - **Not for real events.** Riders should not use it to ride events. For the official app and support, see the [eBrevet FAQ](https://randonneuring.org/about/ebrevet_faq).
 > - **Report problems with this fork here,** in [this repository's issues](https://github.com/rbrancher/ebrevet/issues), not to the original author or randonneuring.org.
 
