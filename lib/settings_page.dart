@@ -28,6 +28,7 @@ import 'my_settings.dart';
 import 'region.dart';
 import 'app_tokens.dart';
 import 'rider_edit_page.dart';
+import 'region_picker_page.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({
@@ -105,55 +106,17 @@ class _EventSearchSettingsState extends State<EventSearchSettings> {
   @override
   Widget build(BuildContext context) {
     var sourceSelection = context.watch<SourceSelection>();
-    List<DropdownMenuItem<String>> regionList = [];
-    final Key key = UniqueKey();
+    final sources = EventSources.list;
+    final n = sources.length;
 
-    // MyLogger.entry('Rebuilding region dropdown list.');
-
-    // In some weird situations we could have a current region set
-    // to be somethnig that's not in the region map (e.g. removed from the
-    // region list). It stays configured (intent 0015): the message below
-    // says so, and the rider can pick another region from the dropdown.
-    final bool isRegionKnown =
-        Region.regionMap.containsKey(AppSettings.regionID.value);
-    if (!isRegionKnown) {
+    // A configured region can be missing from the region map (e.g. removed
+    // from the region list). It stays configured (intent 0015): the message
+    // below says so, and the rider can remove it in the region picker.
+    final bool anyUnknown = sources.any((s) => s.isUnknownRegion);
+    if (anyUnknown) {
       MyLogger.entry('Configured for region not in map.');
     }
-
-    // fromRegion and fromInternationalRegion are essentiall
-    //the same "region" data source that view different subsets
-    // of the same Region.regionMap
-    // These are handy predicates to decide which "view" is active
-    bool viewUSRegions = AppSettings.scheduleEventsSourceID.value ==
-        ScheduleEventsSourceID.fromRegion;
-    bool viewInternationalRegions = AppSettings.scheduleEventsSourceID.value ==
-        ScheduleEventsSourceID.fromInternationalRegion;
-    bool viewAllRegions = viewUSRegions || viewInternationalRegions;
-
-    // Create the drop down list of all viewed regions
-    List<String> sortedRegionIDs = Region.regionMap.keys.toList();
-    sortedRegionIDs.sort((a, b) => Region.compareByStateName(a, b));
-    bool isRegionSettingInList = false; // while we're at it, check this
-    for (var regionID in sortedRegionIDs) {
-      assert(Region.regionMap.containsKey(regionID));
-      var rgn = Region(regionID: regionID);
-      if (AppSettings.regionID.value == regionID) {
-        isRegionSettingInList =
-            true; // Good, and always include it in the dropdown
-      } else {
-        if (viewUSRegions && rgn.countryCode != 'US') continue;
-        if (viewInternationalRegions && rgn.countryCode == 'US') {
-          continue;
-        }
-      }
-
-      String itemText = rgn.regionName;
-      var ddmi = DropdownMenuItem(
-        value: regionID,
-        child: Text(itemText),
-      );
-      regionList.add(ddmi);
-    }
+    final customConfigured = sources.any((s) => s.isCustom);
 
     return Material(
       color: Colors.transparent,
@@ -162,44 +125,32 @@ class _EventSearchSettingsState extends State<EventSearchSettings> {
         subtitle: const Text("Select where to obtain event info. "),
         initiallyExpanded: widget.initiallyExpanded,
         children: [
-          RadioButtonSettingsTile(
-            AppSettings.scheduleEventsSourceID,
-            onChanged: sourceSelection.updateFromSettings,
+          // Summary row (intent 0016); the picker edits the source list.
+          ListTile(
+            key: const Key('event-sources-summary'),
+            title: Text(n == 1 ? '1 region' : '$n regions'),
+            subtitle: Text([
+              for (var i = 0; i < n; i++) '${i + 1}. ${sourceLabel(sources[i])}'
+            ].join('\n')),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context)
+                .push(MaterialPageRoute(
+              builder: (context) => const RegionPickerPage(),
+            ))
+                .then((_) {
+              if (mounted) setState(() {});
+            }),
           ),
-          if (viewAllRegions) ...[
-            if (!isRegionKnown)
-              const Text("Somehow the region selected is not in the "
-                  "list of regions this app knows about. Please try refreshing the region list."),
-            DropDownSettingsTile(
-              AppSettings.regionID,
-              key: key,
-              itemList: regionList,
-              valueValid: isRegionSettingInList,
-              onChanged: sourceSelection.updateFromSettings,
-            ),
-          ],
-
-          // if (AppSettings.futureEventsSourceID.value ==
-          //     FutureEventsSourceID.fromPerm)
-          //   DialogInputSettingsTile(
-          //     AppSettings.permSearchLocation,
-          //     onChanged: sourceSelection.updateFromSettings,
-          //   ),
-          // if (AppSettings.futureEventsSourceID.value ==
-          //     FutureEventsSourceID.fromPerm)
-          //   DialogInputSettingsTile(
-          //     AppSettings.permSearchRadius,
-          //     onChanged: sourceSelection.updateFromSettings,
-          //   ),
-          if (AppSettings.scheduleEventsSourceID.value ==
-              ScheduleEventsSourceID.fromURL) ...[
+          if (anyUnknown) const Text(unknownRegionMessage),
+          // The custom source's URL and secret, while it is configured.
+          if (customConfigured) ...[
             DialogInputSettingsTile(
               AppSettings.eventInfoURL,
-              onChanged: sourceSelection.updateFromSettings,
+              onChanged: sourceSelection.customSettingsChanged,
             ),
             DialogInputSettingsTile(
               AppSettings.customRegionSecret,
-              onChanged: sourceSelection.updateFromSettings,
+              onChanged: sourceSelection.customSettingsChanged,
             ),
           ],
           spacerBox
@@ -227,12 +178,6 @@ class _OptionalAppSettingsState extends State<OptionalAppSettings> {
     var spacerBox = const SizedBox(
       height: 16,
     );
-    bool viewUSRegions = AppSettings.scheduleEventsSourceID.value ==
-        ScheduleEventsSourceID.fromRegion;
-    bool viewInternationalRegions = AppSettings.scheduleEventsSourceID.value ==
-        ScheduleEventsSourceID.fromInternationalRegion;
-    bool viewAllRegions = viewUSRegions || viewInternationalRegions;
-
     return Material(
       color: Colors.transparent,
       child: ExpansionTile(
@@ -250,25 +195,26 @@ class _OptionalAppSettingsState extends State<OptionalAppSettings> {
                   SwitchSettingsTile(AppSettings.canDeletePastEvents),
                   DialogInputSettingsTile(AppSettings.gpsRefreshPeriod),
                   SwitchSettingsTile(AppSettings.finishConfetti),
-                  if (viewAllRegions)
-                    Column(
-                      children: [
-                        spacerBox,
-                        Text(
-                            "There are ${Region.numberOfUsRegions} RUSA regions, "
-                            "and ${Region.numberOfNonUsRegions} International regions loaded. "
-                            "If your region is not in either the RUSA or Intl list, "
-                            "try getting the latest region list from the server."),
-                        spacerBox,
-                        FilledButton.tonal(
-                          onPressed: () async {
-                            await Region.fetchRegionsFromServer();
-                            setState(() {});
-                          },
-                          child: const Text('Get Latest Region List'),
-                        ),
-                      ],
-                    ),
+                  // Always shown (intent 0016): the region picker lists
+                  // whatever regions are loaded.
+                  Column(
+                    children: [
+                      spacerBox,
+                      Text(
+                          "There are ${Region.numberOfUsRegions} RUSA regions, "
+                          "and ${Region.numberOfNonUsRegions} International regions loaded. "
+                          "If your region is not in either the RUSA or Intl list, "
+                          "try getting the latest region list from the server."),
+                      spacerBox,
+                      FilledButton.tonal(
+                        onPressed: () async {
+                          await Region.fetchRegionsFromServer();
+                          setState(() {});
+                        },
+                        child: const Text('Get Latest Region List'),
+                      ),
+                    ],
+                  ),
                 ])),
           ),
         ],
@@ -332,7 +278,7 @@ class _AdvancedSettingsState extends State<AdvancedSettings> {
                     onPressed: () {
                       // The selected source only (intent 0015).
                       ScheduledEvents.clearSource(EventSources.selected);
-                      sourceSelection.updateFromSettings();
+                      sourceSelection.refresh();
                     },
                     child: const Text('Clear Event List'),
                   ),

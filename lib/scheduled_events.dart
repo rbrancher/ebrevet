@@ -106,7 +106,8 @@ class ScheduledEventsSource {
   }
 
   /// The single source described by the old settings
-  /// (`scheduleEventsSourceID`, `regionID`), which the Settings screen edits.
+  /// (`scheduleEventsSourceID`, `regionID`). Used for migration only; since
+  /// intent 0016 Settings no longer writes these keys.
   factory ScheduledEventsSource.fromSettingsSourceID() {
     var sourceID = AppSettings.scheduleEventsSourceID.value;
     return ScheduledEventsSource(sourceID,
@@ -287,24 +288,26 @@ class EventSources {
   static Future<void> select(ScheduledEventsSource source) =>
       _selectedSetting.setValue(source.key);
 
-  /// For the single-source Settings screen: [source] takes the place of its
-  /// own entry if already listed (e.g. a US/International category change),
-  /// else of the selected entry, and becomes the selection. No cache is
-  /// touched.
-  static Future<void> replaceSelected(ScheduledEventsSource source) async {
-    final sources = list;
-    var i = sources.indexWhere((s) => s.key == source.key);
-    if (i < 0) {
-      final current = selected.key;
-      i = sources.indexWhere((s) => s.key == current);
+  /// Stores [sources] as the new list (intent 0016, region picker). If the
+  /// selected source is no longer listed, or [selectFirst] is set, the first
+  /// source becomes selected. Every removed source has its cache file and
+  /// in-memory cache dropped; other sources' caches are untouched. Throws
+  /// [ArgumentError] for an empty list or a duplicate (see [save]).
+  static Future<void> update(List<ScheduledEventsSource> sources,
+      {bool selectFirst = false}) async {
+    if (sources.isEmpty) {
+      throw ArgumentError('At least one event source is required');
     }
-    if (i < 0) {
-      sources.add(source);
-    } else {
-      sources[i] = source;
-    }
+    final old = list;
+    final oldSelected = selected.key;
     await save(sources);
-    await select(source);
+    final keys = {for (final s in sources) s.key};
+    if (selectFirst || !keys.contains(oldSelected)) {
+      await select(sources.first);
+    }
+    for (final s in old) {
+      if (!keys.contains(s.key)) await ScheduledEvents.removeSource(s);
+    }
   }
 }
 
@@ -317,21 +320,32 @@ class SourceSelection extends ChangeNotifier {
 
   SourceSelection() : eventInfoSource = EventSources.selected;
 
-  /// Called when the Settings screen changes the source settings. Only the
-  /// selected source changes; other sources' caches are kept.
-  void updateFromSettings() {
-    final next = ScheduledEventsSource.fromSettingsSourceID();
-    if (next.isCustom && next.key == EventSources.selected.key) {
-      // The custom URL or secret may have changed: the custom cache may hold
-      // another server's events, so drop it (as before, for this source only).
-      ScheduledEvents.clearSource(next);
-    }
-    EventSources.replaceSelected(next);
+  /// Re-reads the selected source and shows its cached events (loading them
+  /// from disk if needed). Other sources' caches are kept.
+  Future<void> refresh() async {
+    final next = EventSources.selected;
     eventInfoSource = next;
     notifyListeners();
-    ScheduledEvents.ensureLoaded(next).then((_) {
-      if (!_disposed) notifyListeners();
-    });
+    await ScheduledEvents.ensureLoaded(next);
+    if (!_disposed) notifyListeners();
+  }
+
+  /// The region picker changed the source list (intent 0016); see
+  /// [EventSources.update].
+  Future<void> setSources(List<ScheduledEventsSource> sources,
+      {bool selectFirst = false}) async {
+    await EventSources.update(sources, selectFirst: selectFirst);
+    await refresh();
+  }
+
+  /// The custom URL or secret changed: the custom cache may hold another
+  /// server's events, so drop it (the custom source only).
+  Future<void> customSettingsChanged() async {
+    final custom = ScheduledEventsSource(ScheduleEventsSourceID.fromURL);
+    if (!EventSources.canAdd(EventSources.list, custom)) {
+      ScheduledEvents.clearSource(custom);
+    }
+    await refresh();
   }
 
   @override
@@ -411,7 +425,14 @@ class ScheduledEvents {
   /// Clears the in-memory and disk cache of [source] only.
   static void clearSource(ScheduledEventsSource source) {
     _caches[source.key] = SourceCache()..loaded = true;
-    storageFor(source).clear();
+    unawaited(storageFor(source).clear());
+  }
+
+  /// Drops the in-memory cache and the cache file of a removed [source]
+  /// (intent 0016). Other sources are untouched.
+  static Future<void> removeSource(ScheduledEventsSource source) async {
+    _caches.remove(source.key);
+    await storageFor(source).clear();
   }
 
   /// Forgets every in-memory cache (tests). Disk files are kept.

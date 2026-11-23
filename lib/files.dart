@@ -43,7 +43,7 @@ class FileStorage {
     return File('$path/$fileName');
   }
 
-  void clear() async {
+  Future<void> clear() async {
     if (kIsWeb) {
       await (await SharedPreferences.getInstance()).remove(_webKey);
       return;

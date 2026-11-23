@@ -181,9 +181,11 @@ void main() {
       expect(ScheduledEvents.cacheFor(b).events, isNotEmpty);
     });
 
-    test('Settings changes (updateFromSettings) keep other sources\' data',
-        () async {
+    // Since intent 0016 Settings changes the source list through the region
+    // picker (SourceSelection.setSources) instead of updateFromSettings.
+    test('Settings changes (setSources) keep other sources\' data', () async {
       final a = regionSource('938017');
+      final b = regionSource(MockServer.altRegionID);
       await EventSources.save([a]);
       await refreshFromMock(a);
       final aEvents = [
@@ -191,9 +193,7 @@ void main() {
       ];
 
       final selection = SourceSelection();
-      await AppSettings.regionID.setValue(MockServer.altRegionID);
-      selection.updateFromSettings();
-      await pumpEventQueue();
+      await selection.setSources([b, a], selectFirst: true);
       expect(EventSources.selected.key, 'region-${MockServer.altRegionID}');
       expect(selection.eventInfoSource.key, 'region-${MockServer.altRegionID}');
       expect(ScheduledEvents.events, isEmpty); // B not loaded yet
@@ -204,9 +204,7 @@ void main() {
       expect((await ScheduledEvents.storageFor(a).readJSON()), isNotEmpty);
 
       // Switching back shows A's events again, without a refresh.
-      await AppSettings.regionID.setValue('938017');
-      selection.updateFromSettings();
-      await pumpEventQueue();
+      await selection.setSources([a, b], selectFirst: true);
       expect([for (final e in ScheduledEvents.events) e.eventID], aEvents);
       selection.dispose();
     });
@@ -383,8 +381,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('Somehow the region selected is not in the'),
         findsOneWidget);
-    // The rider can still pick another region.
-    expect(find.byType(DropdownButton<String>), findsOneWidget);
+    // The rider can still open the region picker (intent 0016 replaced the
+    // dropdown with a summary row).
+    expect(find.byKey(const Key('event-sources-summary')), findsOneWidget);
     expect(tester.takeException(), isNull);
     // Nothing was silently reset.
     expect(AppSettings.regionID.value, '999999');
